@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:schemas="http://test/model" xmlns:wsdl="http://test/service" targetNamespace="http://test/service" xmlns="http://schemas.xmlsoap.org/wsdl/">
+  <types>
+    <xs:schema xmlns:tns="http://test/model" targetNamespace="http://test/model" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+      <xs:element name="GetTestData_InputMessage" type="schemas:GetTestData_InputMessage" />
+      <xs:element name="GetTestData_OutputMessage" type="schemas:GetTestData_OutputMessage" />
+      <xs:element name="GetTestData_400" type="schemas:TestDataResponse400"></xs:element>
+      <xs:element name="GetTestData_500" type="schemas:Response500"></xs:element>
+      <xs:element name="GetTestDataById_InputMessage" type="schemas:GetTestDataById_InputMessage" />
+      <xs:element name="GetTestDataById_OutputMessage" type="schemas:GetTestDataById_OutputMessage" />
+      <xs:element name="GetTestDataById_500" type="schemas:Response500"></xs:element>
+      <xs:element name="PostTestData_InputMessage" type="schemas:PostTestData_InputMessage" />
+      <xs:element name="PostTestData_OutputMessage" type="schemas:PostTestData_OutputMessage" />
+      <xs:element name="PostTestData_400" type="schemas:TestDataResponse400"></xs:element>
+      <xs:element name="PostTestDataById_InputMessage" type="schemas:PostTestDataById_InputMessage" />
+      <xs:element name="PostTestDataById_OutputMessage" type="schemas:PostTestDataById_OutputMessage" />
+
+      <!-- map models -->
+      <xs:complexType name="TestDataObject">
+        <xs:sequence>
+          <xs:element minOccurs="1" name="id" type="xs:string"></xs:element>
+          <xs:element minOccurs="1" name="meta" type="schemas:TestMetadata"></xs:element>
+        </xs:sequence>
+      </xs:complexType>
+
+      <xs:complexType name="TestMetadata">
+        <xs:sequence>
+          <xs:element minOccurs="1" name="name" type="xs:string"></xs:element>
+          <xs:element minOccurs="1" name="value" type="xs:integer"></xs:element>
+          <xs:element minOccurs="1" name="code" type="schemas:TestCode"></xs:element>
+        </xs:sequence>
+      </xs:complexType>
+
+      <xs:complexType name="TestDataResponse400">
+        <xs:sequence>
+          <xs:element minOccurs="1" name="id" type="xs:string"></xs:element>
+        </xs:sequence>
+      </xs:complexType>
+
+      <xs:complexType name="Response500">
+        <xs:sequence>
+          <xs:element minOccurs="1" name="id" type="xs:string"></xs:element>
+        </xs:sequence>
+      </xs:complexType>
+
+      <!-- api info -->
+      <xs:complexType name="GetTestData_InputMessage">
+      </xs:complexType>
+      <xs:complexType name="GetTestData_OutputMessage">
+        <xs:sequence>
+          <xs:element minOccurs="1" name="TestDataObject"></xs:element>
+        </xs:sequence>
+      </xs:complexType>
+
+      <xs:complexType name="GetTestDataById_InputMessage">
+        <xs:element minOccurs="1" name="id" type="xs:string" />
+      </xs:complexType>
+      <xs:complexType name="GetTestDataById_OutputMessage">
+        <xs:element minOccurs="1" name="TestDataObject" type="schemas:TestDataObject" />
+      </xs:complexType>
+
+      <xs:complexType name="PostTestData_InputMessage">
+        <xs:sequence>
+          <xs:element minOccurs="1" name="body" type="schemas:TestDataObject"></xs:element>
+        </xs:sequence>
+      </xs:complexType>
+      <xs:complexType name="PostTestData_OutputMessage">
+        <xs:element minOccurs="1" name="TestDataObject" />
+      </xs:complexType>
+
+      <xs:simpleType name="TestCode">
+        <xs:restriction base="xs:integer">
+          <xs:enumeration value="200" />
+          <xs:enumeration value="300" />
+          <xs:enumeration value="400" />
+          <xs:enumeration value="404" />
+          <xs:enumeration value="500" />
+        </xs:restriction>
+      </xs:simpleType>
+
+      <xs:complexType name="PostTestDataById_InputMessage">
+        <xs:sequence>
+        <xs:element minOccurs="1" name="id" type="xs:string" />
+        </xs:sequence>
+      </xs:complexType>
+      <xs:complexType name="PostTestDataById_OutputMessage">
+        <xs:sequence>
+          <xs:element minOccurs="1" name="body" type="schemas:TestDataObject"></xs:element>
+        </xs:sequence>
+      </xs:complexType>
+    </xs:schema>
+  </types>
+  <message name="GetTestData_InputMessage">
+    <part name="GetTestData_InputMessage" element="schemas:GetTestData_InputMessage" />
+  </message>
+  <message name="GetTestData_OutputMessage">
+    <part name="GetTestData_OutputMessage" element="schemas:GetTestData_OutputMessage" />
+  </message>
+  <message name="GetTestData_400">
+    <part name="GetTestData_400" element="schemas:GetTestData_400" />
+  </message>
+  <message name="GetTestData_500">
+    <part name="GetTestData_500" element="schemas:GetTestData_500" />
+  </message>
+  <message name="GetTestDataById_InputMessage">
+    <part name="GetTestDataById_InputMessage" element="schemas:GetTestDataById_InputMessage" />
+  </message>
+  <message name="GetTestDataById_OutputMessage">
+    <part name="GetTestDataById_OutputMessage" element="schemas:GetTestDataById_OutputMessage" />
+  </message>
+  <message name="PostTestData_InputMessage">
+    <part name="PostTestData_InputMessage" element="schemas:PostTestData_InputMessage" />
+  </message>
+  <message name="PostTestData_OutputMessage">
+    <part name="PostTestData_OutputMessage" element="schemas:PostTestData_OutputMessage" />
+  </message>
+  <message name="PostTestData_400">
+    <part name="PostTestData_400" element="schemas:PostTestData_400" />
+  </message>
+  <message name="PostTestDataById_InputMessage">
+    <part name="PostTestDataById_InputMessage" element="schemas:PostTestDataById_InputMessage" />
+  </message>
+  <message name="PostTestDataById_OutputMessage">
+    <part name="PostTestDataById_OutputMessage" element="schemas:PostTestDataById_OutputMessage" />
+  </message>
+  <portType name="TestService_PortType">
+    <operation name="GetTestData">
+      <input message="wsdl:GetTestData_InputMessage" />
+      <output message="wsdl:GetTestData_OutputMessage"></output>
+      <fault name="GetTestData_400" message="wsdl:GetTestData_400"></fault>
+      <fault name="GetTestData_500" message="wsdl:GetTestData_500"></fault>
+    </operation>
+    <operation name="GetTestDataById">
+      <input message="wsdl:GetTestDataById_InputMessage" />
+      <output message="wsdl:GetTestDataById_OutputMessage"></output>
+      <fault name="GetTestDataById_500" message="wsdl:GetTestDataById_500"></fault>
+    </operation>
+    <operation name="PostTestData">
+      <input message="wsdl:PostTestData_InputMessage" />
+      <output message="wsdl:PostTestData_OutputMessage"></output>
+      <fault name="PostTestData_400" message="wsdl:PostTestData_400"></fault>
+    </operation>
+    <operation name="PostTestDataById">
+      <input message="wsdl:PostTestDataById_InputMessage" />
+      <output message="wsdl:PostTestDataById_OutputMessage"></output>
+    </operation>
+  </portType>
+  <binding name="TestService_Binding" type="wsdl:TestService_PortType">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+    <operation name="GetTestData">
+      <soap:operation soapAction="GetTestData" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      <input>
+        <soap:body use="literal" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </input>
+      <output>
+        <soap:body use="literal" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </output>
+      <fault name="GetTestData_400">
+        <soap:fault use="literal" name="GetTestData_400" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </fault>
+      <fault name="GetTestData_500">
+        <soap:fault use="literal" name="GetTestData_500" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </fault>
+    </operation>
+    <operation name="GetTestDataById">
+      <soap:operation soapAction="GetTestDataById" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      <input>
+        <soap:body use="literal" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </input>
+      <output>
+        <soap:body use="literal" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </output>
+      <fault name="GetTestDataById_500">
+        <soap:fault use="literal" name="GetTestDataById_500" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </fault>
+    </operation>
+    <operation name="PostTestData">
+      <soap:operation soapAction="PostTestData" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      <input>
+        <soap:body use="literal" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </input>
+      <output>
+        <soap:body use="literal" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </output>
+      <fault name="PostTestData_400">
+        <soap:fault use="literal" name="PostTestData_400" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </fault>
+    </operation>
+    <operation name="PostTestDataById">
+      <soap:operation soapAction="PostTestDataById" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      <input>
+        <soap:body use="literal" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </input>
+      <output>
+        <soap:body use="literal" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+      </output>
+    </operation>
+  </binding>
+  <service name="TestService">
+    <port name="default_Port" binding="wsdl:TestService_Binding">
+      <soap:address location="http://test" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" />
+    </port>
+  </service>
+</definitions>

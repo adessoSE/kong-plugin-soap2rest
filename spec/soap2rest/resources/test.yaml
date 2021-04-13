@@ -1,0 +1,117 @@
+openapi: 3.0.1
+info:
+  title: TEST
+  version: "1.0"
+servers:
+- url: https://gdv/api/
+paths:
+  /spec/test/data:
+    get:
+      operationId: getVersion
+      responses:
+        "200":
+          content:
+            application/spec.api.v1+json:
+              schema:
+                $ref: '#/components/schemas/TestData'
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestDataResponse400'
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response500'
+      x-accepts: application/spec.api.v1+json,text/plain
+    post:
+      requestBody:
+        $ref: '#/components/requestBodies/Eingabeparameter_Standortanalyse'
+        content:
+          multipart/mixed:
+            encoding:
+              datei:
+                contentType: text/plain, text/csv
+              metadaten:
+                contentType: application/spec.api.v1+json
+            schema:
+              properties:
+                datei:
+                  format: binary
+                  type: string
+                metadaten:
+                  $ref: '#/components/schemas/TestData'
+              required:
+              - datei
+              - metadaten
+              type: object
+        required: true
+      responses:
+        "200":
+          content:
+            application/spec.api.v1+json:
+              schema:
+                $ref: '#/components/schemas/TestData'
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestDataResponse400'
+      x-contentType: multipart/mixed
+      x-accepts: application/spec.api.v1+json
+  /spec/test/data/{id}:
+    get:
+      parameters:
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+      responses:
+        "200":
+          content:
+            application/spec.api.v1+json:
+              schema:
+                $ref: '#/components/schemas/TestData'
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response500'
+      x-accepts: application/spec.api.v1+json
+    post:
+      requestBody:
+        content:
+          multipart/mixed:
+            schema:
+              properties:
+                datei:
+                  format: binary
+                  type: string
+                metadaten:
+                  $ref: '#/components/schemas/TestData'
+              required:
+              - datei
+              - metadaten
+              type: object
+        required: true
+      responses:
+        "200":
+          content:
+            application/spec.api.v1+json:
+              schema:
+                $ref: '#/components/schemas/TestData'
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestDataResponse400'
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response500'
+      x-contentType: multipart/mixed
+      x-accepts: application/json

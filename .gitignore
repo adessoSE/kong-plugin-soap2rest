@@ -1,0 +1,15 @@
+# servroot is typically the nginx/Kong workingdirectory when testing
+servroot
+
+# packed distribution format for LuaRocks
+*.rock
+
+# Lua dependencies
+/lua_modules
+
+/test
+
+# Test coverage
+luacov.stats.out
+luacov.report.out
+luacov.report.out.index

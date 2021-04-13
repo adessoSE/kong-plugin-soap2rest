@@ -1,0 +1,7 @@
+runreport = false;
+modules = {
+   ["soap2rest.*"] = "kong/plugins"
+}
+exclude = {
+    "puremagic"
+}
