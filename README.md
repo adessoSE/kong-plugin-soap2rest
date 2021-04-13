@@ -19,8 +19,8 @@ A plugin for the [Kong Microservice API Gateway](https://konghq.com/solutions/ga
     </li>
     <li><a href="#usage">Usage</a>
       <ul>
-        <li><a href="#enabling-plugin">Enabling plugin</a></li>
         <li><a href="#configuration">Configuration</a></li>
+        <li><a href="#enabling-plugin">Enabling plugin</a></li>
       </ul>
     </li>
     <li><a href="#development">Development</a>
@@ -31,7 +31,7 @@ A plugin for the [Kong Microservice API Gateway](https://konghq.com/solutions/ga
       </ul>
     </li>
     <li><a href="#example">Example</a></li>
-    <li><a href="#license">License</a></li>
+    <li><a href="https://github.com/adessoAG/kong-plugin-soap2rest/blob/master/LICENSE">License</a></li>
   </ol>
 </details>
 
