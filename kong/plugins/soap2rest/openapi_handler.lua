@@ -119,7 +119,7 @@ function _M.parseOpenAPI(plugin_conf)
     -- read the OpenAPI file to string
     local status, yaml_content = pcall(read_file, plugin_conf.openapi_yaml_path)
     if not status then
-        kong.log.err("Unable to read OpenAPI file\n\t", yaml_content)
+        kong.log.err("Unable to read OpenAPI file '"..plugin_conf.wsdl_path.."' \n\t", yaml_content)
         return
     end
 

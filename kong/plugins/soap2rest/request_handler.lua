@@ -35,7 +35,7 @@ local function read_file(path)
     local file = io.open(path, "r")
     local content = file:read("*a")
     file:close()
-    print(os.remove(path))
+    kong.log.debug(os.remove(path))
     return content
 end --]]
 
@@ -57,7 +57,12 @@ local function parseBody()
     if xml_request == nil then
         kong.log.debug(msg)
         local temp_file = ngx.req.get_body_file()
-        xml_request = read_file(temp_file)
+
+        local status
+        status, xml_request = pcall(read_file, temp_file)
+        if not status then
+            error("Unable to read buffered file '"..temp_file.."' \n\t"..xml_request)
+        end
     end
 
     local soap_header_raw = string.gmatch(xml_request, '<[^:<>!]*:Header[%s>].*</[^:<>!]*:Header>')()
@@ -193,7 +198,11 @@ function _M.convert(plugin_conf)
         return "WSDL_FILE"
     end
 
-    local soap_header, soap_header_raw, soap_body = parseBody()
+    local status, soap_header, soap_header_raw, soap_body = pcall(parseBody)
+    if not status then
+        kong.log.err("Unable to parse soap request body\n\t", soap_header)
+        return nil
+    end
 
     -- Analyse request body
     local RequestAction, bodyValue = next(soap_body)

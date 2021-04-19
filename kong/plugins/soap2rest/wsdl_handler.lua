@@ -184,7 +184,7 @@ function _M.parseWSDL(plugin_conf)
     local status, wsdl_content = pcall(read_file, plugin_conf.wsdl_path)
 
     if not status then
-        kong.log.err("Unable to read WSDL file\n\t", wsdl_content)
+        kong.log.err("Unable to read WSDL file '"..plugin_conf.wsdl_path.."' \n\t", wsdl_content)
         return
     end
 

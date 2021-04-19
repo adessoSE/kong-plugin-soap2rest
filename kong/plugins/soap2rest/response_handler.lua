@@ -69,19 +69,30 @@ end --]]
 local function build_XML(plugin_conf, table_response, response_code, RequestAction, targetNamespace, soap)
 
     if tonumber(string.sub(response_code, 1,1)) == 4 then
-        local fault_detail = toXml(plugin_conf, soap.fault400.name, soap.fault400.type, table_response, "")
+        local status, fault_detail = pcall(toXml, plugin_conf, soap.fault400.name, soap.fault400.type, table_response, "")
+        if not status then
+            error("Unable to build client fault response\n\t", fault_detail)
+        end
+
         fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" )
         return build_SOAP_fault('soap:Client', 'Client error has occurred', fault_detail)
     end
 
     if tonumber(string.sub(response_code, 1,1)) == 5 then
-        local fault_detail = toXml(plugin_conf, soap.fault500.name, soap.fault500.type, table_response, "")
+        local status, fault_detail = pcall(toXml, plugin_conf, soap.fault500.name, soap.fault500.type, table_response, "")
+        if not status then
+            error("Unable to build server fault response\n\t", fault_detail)
+        end
+
         fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" )
         return build_SOAP_fault('soap:Server', 'Server error has occurred', fault_detail)
     end
 
     -- Convert response to XML
-    local xml_response = toSortedXml(plugin_conf, soap.response, table_response)
+    local status, xml_response = pcall(toSortedXml, plugin_conf, soap.response, table_response)
+    if not status then
+        error("Unable to build xml response\n\t", xml_response)
+    end
 
     xml_response = [[
 <]]..RequestAction.."_OutputMessage"..[[>
