@@ -38,7 +38,7 @@ A plugin for the [Kong Microservice API Gateway](https://konghq.com/solutions/ga
 ## Compatible Kong versions
 
 | Kong Version |   Tests passing    |
-| ------------ | :----------------: |
+| :----------- | :----------------: |
 | 2.3.x        | :white_check_mark: |
 | 2.2.x        | :white_check_mark: |
 | 2.1.x        | :white_check_mark: |
@@ -92,7 +92,7 @@ RUN luarocks install /tmp/plugins/kong-plugin-soap2rest*.rock && \
 ### Configuration
 
 | Parameter                   | Required | Default | Description                                                              |
-| --------------------------- | -------- | ------- | ------------------------------------------------------------------------ |
+| :-------------------------- | :------: | :-----: | :----------------------------------------------------------------------- |
 | name                        | yes      |         | The name of the plugin to use, in this case `soap2rest`.                 |
 | service_id                  | semi     |         | The id of the Service which this plugin will target.                     |
 | route_id                    | semi     |         | The id of the Route which this plugin will target.                       |
