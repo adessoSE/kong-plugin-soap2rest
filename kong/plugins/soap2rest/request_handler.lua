@@ -147,8 +147,9 @@ local function convertPOST(operation, bodyValue)
             RequestPath, count = string.gsub(RequestPath, "{"..key.."}", value)
             if count == 0 then
                 if key == "body" then
-                    key, value = next(value)
-                    body[key] = value
+                    for body_key, body_value in pairs(value) do
+                        body[body_key] = body_value
+                    end
                 else
                     body[key] = value
                 end

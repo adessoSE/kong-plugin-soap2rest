@@ -39,7 +39,7 @@ local function toXml(plugin_conf, objectname, objecttype, object, tab)
                     xml = xml..toXml(plugin_conf, value.name, value.type, object[value.name], tab.."  ")
                 end
             else
-                xml = xml..tab.."  <"..value.name..">"..(object[value.name] ~= nil and object[value.name] or "").."</"..value.name..">\n"
+                xml = xml..tab.."  <"..value.name..">"..(object[value.name] ~= nil and tostring(object[value.name]) or "").."</"..value.name..">\n"
             end
         end
     end
