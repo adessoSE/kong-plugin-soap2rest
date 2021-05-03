@@ -24,6 +24,23 @@ local cjson = require "cjson.safe"
 
 local _M = {}
 
+---[[ convert value to xml compatible value. bad signs are escaped
+local function toXmlValue(simpleValue)
+    local xmlValue
+    if simpleValue ~= nil and simpleValue ~= cjson.null then
+        xmlValue = tostring(simpleValue)
+    else
+        xmlValue = ""
+    end
+
+    -- escape special signs
+    if string.match(xmlValue, "[\"'<>&]") then
+        xmlValue = "<![CDATA["..xmlValue.."]]>"
+    end
+
+    return xmlValue
+end --]]
+
 ---[[ builds sorted xml data
 local function toXml(plugin_conf, objectname, objecttype, object, tab)
     local xml = tab.."<"..objectname..">\n"
@@ -39,7 +56,8 @@ local function toXml(plugin_conf, objectname, objecttype, object, tab)
                     xml = xml..toXml(plugin_conf, value.name, value.type, object[value.name], tab.."  ")
                 end
             else
-                xml = xml..tab.."  <"..value.name..">"..(object[value.name] ~= nil and tostring(object[value.name]) or "").."</"..value.name..">\n"
+                kong.log.debug(value.name..": "..tostring(object[value.name]).." ("..type(object[value.name])..")")
+                xml = xml..tab.."  <"..value.name..">"..toXmlValue(object[value.name]).."</"..value.name..">\n"
             end
         end
     end
@@ -69,21 +87,31 @@ end --]]
 local function build_XML(plugin_conf, table_response, response_code, RequestAction, targetNamespace, soap)
 
     if tonumber(string.sub(response_code, 1,1)) == 4 then
-        local status, fault_detail = pcall(toXml, plugin_conf, soap.fault400.name, soap.fault400.type, table_response, "")
-        if not status then
-            error("Unable to build client fault response\n\t", fault_detail)
+        local fault_detail
+        if soap.fault400 ~= nil then
+            local status
+            status, fault_detail = pcall(toXml, plugin_conf, soap.fault400.name, soap.fault400.type, table_response, "")
+            if not status then
+                error("Unable to build client fault response\n\t", fault_detail)
+            end
+        else
+            fault_detail = cjson.encode(table_response)
         end
-
         fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" )
         return build_SOAP_fault('soap:Client', 'Client error has occurred', fault_detail)
     end
 
     if tonumber(string.sub(response_code, 1,1)) == 5 then
-        local status, fault_detail = pcall(toXml, plugin_conf, soap.fault500.name, soap.fault500.type, table_response, "")
-        if not status then
-            error("Unable to build server fault response\n\t", fault_detail)
+        local fault_detail
+        if soap.fault500 ~= nil then
+            local status
+            status, fault_detail = pcall(toXml, plugin_conf, soap.fault500.name, soap.fault500.type, table_response, "")
+            if not status then
+                error("Unable to build server fault response\n\t", fault_detail)
+            end
+        else
+            fault_detail = cjson.encode(table_response)
         end
-
         fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" )
         return build_SOAP_fault('soap:Server', 'Server error has occurred', fault_detail)
     end
@@ -101,7 +129,7 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
 ]]
 
     -- Add namespace shortname to xml response
-    return string.gsub(xml_response, "(<%/?)", "%1"..targetNamespace..":" )
+    return string.gsub(xml_response, "(<+%/?)([%w_]*)( ?%/?>+)", "%1"..targetNamespace..":%2%3")
 end --]]
 
 ---[[ builds the SOAP response
@@ -126,6 +154,7 @@ end --]]
 
 ---[[ generates the SOAP response
 function _M.generateResponse(plugin_conf, table_response, response_code, RequestAction)
+    kong.log.debug("Response Body: "..table_response)
     table_response = cjson.decode(table_response)
 
     if type(table_response) == "table" or table_response == nil then
@@ -143,6 +172,8 @@ function _M.generateResponse(plugin_conf, table_response, response_code, Request
         local status, soap_response = pcall(build_SOAP, xml_response, plugin_conf.namespaces, plugin_conf.targetNamespace)
         if not status then
             kong.log.err("Unable to build SOAP response\n\t", soap_response)
+        else
+            kong.log.debug("SOAP Response: "..soap_response)
         end
 
         return soap_response

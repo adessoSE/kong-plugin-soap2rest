@@ -34,6 +34,7 @@ build = {
     ["kong.plugins."..pluginName..".response_handler"] = "kong/plugins/"..pluginName.."/response_handler.lua",
     ["kong.plugins."..pluginName..".wsdl_handler"] = "kong/plugins/"..pluginName.."/wsdl_handler.lua",
     ["kong.plugins."..pluginName..".openapi_handler"] = "kong/plugins/"..pluginName.."/openapi_handler.lua",
+    ["kong.plugins."..pluginName..".utils"] = "kong/plugins/"..pluginName.."/utils.lua",
     ["kong.plugins."..pluginName..".puremagic"] = "kong/plugins/"..pluginName.."/puremagic.lua",
   }
 }

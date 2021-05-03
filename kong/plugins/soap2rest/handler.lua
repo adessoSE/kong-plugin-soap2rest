@@ -43,6 +43,12 @@ soap2rest.VERSION = "1.0.2-1"
 function soap2rest:access(plugin_conf)
     soap2rest.super.access(self)
 
+    -- log all http headers
+    local headers = kong.request.get_headers()
+    for key, value in pairs(headers) do
+        kong.log.debug("Header: " .. key .. "; Value: " .. value)
+    end
+
     if plugin_conf.operations == nil then
         local status, msg = pcall(wsdl_handler.parseWSDL, plugin_conf)
         if status then

@@ -20,17 +20,11 @@
 
 local lyaml   = require "lyaml"
 
+local utils = require "kong.plugins.soap2rest.utils"
+
 --local inspect = require "inspect"
 
 local _M = {}
-
----[[ reads the OpenAPI file
-local function read_file(path)
-    local file = io.open(path, "r")
-    local content = file:read("*a")
-    file:close()
-    return content
-end --]]
 
 ---[[ builds REST request path
 local function getRequestPath(plugin_conf, RequestAction)
@@ -54,25 +48,28 @@ local function getRequestPath(plugin_conf, RequestAction)
 end --]]
 
 ---[[ Parse operation
-local function parseOperation(operation)
+local function parseOperation(operationName, operation)
     local request, response = {type = "application/json"}, {type = "application/json"}
     if operation.requestBody ~= nil then
-        kong.log.debug("Parsing body of the operation")
+        kong.log.debug("Parsing body of the operation: "..operationName)
 
         if operation["x-contentType"] ~= nil then
             kong.log.debug("Found x-contenttype")
             request.type = operation["x-contentType"]
         else
-            kong.log.debug("Use plain content")
             request.type = next(operation.requestBody.content)
+            kong.log.debug("Use plain content: "..request.type)
         end
 
-        if request.type == "multipart/mixed" then
+        if string.find(request.type, "multipart/") ~= nil then
+            kong.log.debug("Found Multipart: "..request.type)
             local encoding = operation.requestBody.content[request.type].encoding
             request["encoding"] = {
                 file = encoding.datei.contentType,
                 meta = encoding.metadaten.contentType
             }
+
+            kong.log.debug("Encoding: file = "..encoding.datei.contentType..", meta = "..encoding.metadaten.contentType)
         end
     end
     kong.log.debug("Request Type: "..request.type)
@@ -93,8 +90,10 @@ local function parseOpenAPI(plugin_conf, openapi_table)
         local action, path = getRequestPath(plugin_conf, requestAction)
 
         for key, value in pairs(openapi_table.paths) do
+            kong.log.debug("API Path: "..key)
             if string.find(path, key) then
-                local status, request, response = pcall(parseOperation, value[action])
+                local status, request, response = pcall(parseOperation, action, value[action])
+
                 if status then
                     operation["rest"] = {
                         action = action,
@@ -103,6 +102,7 @@ local function parseOpenAPI(plugin_conf, openapi_table)
                         response = response
                     }
                 else
+                    kong.log.debug("Error While Parsing Method: "..tostring(request))
                     operation["rest"] = {
                         action = action,
                         path = path
@@ -117,7 +117,7 @@ end --]]
 ---[[ Parse OpenAPI file
 function _M.parseOpenAPI(plugin_conf)
     -- read the OpenAPI file to string
-    local status, yaml_content = pcall(read_file, plugin_conf.openapi_yaml_path)
+    local status, yaml_content = pcall(utils.read_file, plugin_conf.openapi_yaml_path)
     if not status then
         kong.log.err("Unable to read OpenAPI file '"..plugin_conf.wsdl_path.."' \n\t", yaml_content)
         return

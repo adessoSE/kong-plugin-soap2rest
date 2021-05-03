@@ -24,34 +24,52 @@ local handler = require "xmlhandler.tree"
 local base64 = require "base64"
 local Multipart = require "multipart"
 
+local utils = require "kong.plugins.soap2rest.utils"
 local puremagic = require "kong.plugins.soap2rest.puremagic"
 
 --local inspect = require "inspect"
 
 local _M = {}
 
----[[ reads the OpenAPI file
-local function read_file(path)
-    local file = io.open(path, "r")
-    local content = file:read("*a")
-    file:close()
-    kong.log.debug(os.remove(path))
-    return content
-end --]]
+---[[ convert values
+local function convertValues(plugin_conf, table, ebene)
+    if table == nil then
+        return
+    end
 
----[[ convert number values to number
-local function convertToNumber(table)
     for key, value in pairs(table) do
         if type(value) == "table" then
-            convertToNumber(value)
+            if next(value) == nil and ebene > 0 then
+                -- leere tables außer das root element müssen entfernt werden
+                -- sonst werden sie als leeres objekt ({}) gerendert
+                kong.log.debug("Removing "..key.." because it is an empty table")
+                table[key] = nil
+            else
+                convertValues(plugin_conf, value, ebene + 1)
+            end
+
         elseif tonumber(value) ~= nil and not string.match(value, "^0[^%.]%d*$") then
+            -- convert numbers
             table[key] = tonumber(value)
+
+        elseif utils.has_value(plugin_conf.soap_arrays, key) then
+            -- fix arrays
+            kong.log.debug("Forcing "..key.." to be an array")
+            table[key] = { value }
+            convertValues(plugin_conf, table[key], ebene + 1)
+            setmetatable(table[key], cjson.array_mt)
+
+        elseif string.match(value, "^{.*}$") then
+            -- convert JSON
+            kong.log.debug("Converting "..key.." to be a JSON")
+            table[key] = cjson.decode(value)
+
         end
     end
 end --]]
 
 ---[[ parse SOAP request body to Lua table
-local function parseBody()
+local function parseBody(plugin_conf)
     local xml_request, msg = kong.request.get_raw_body()
 
     if xml_request == nil then
@@ -59,7 +77,8 @@ local function parseBody()
         local temp_file = ngx.req.get_body_file()
 
         local status
-        status, xml_request = pcall(read_file, temp_file)
+        status, xml_request = pcall(utils.read_file, temp_file)
+        kong.log.debug(os.remove(temp_file))
         if not status then
             error("Unable to read buffered file '"..temp_file.."' \n\t"..xml_request)
         end
@@ -77,10 +96,16 @@ local function parseBody()
     parser:parse(xml_request)
 
     local soap_header = request_handler.root["Envelope"]["Header"]
-    convertToNumber(soap_header)
+    convertValues(plugin_conf, soap_header, 0)
 
     local soap_body = request_handler.root["Envelope"]["Body"]
-    convertToNumber(soap_body)
+
+    -- remove attributes from body, propably only namespaces
+    if soap_body["_attr"] ~= nil then
+        soap_body["_attr"] = nil
+    end
+
+    convertValues(plugin_conf, soap_body, 0)
 
     return soap_header, soap_header_raw, soap_body
 end --]]
@@ -98,9 +123,15 @@ local function convertHeader(soap_header, soap_header_raw, operation)
     if soap_header ~= nil then
         for key, value in pairs(soap_header) do
             if type(value) == "table" then
-                local data = string.gmatch(soap_header_raw, "<[^:<>!]*:"..key.."[%s>]+.*</[^:<>!]*:"..key..">")()
-                local encoded_data = base64.encode(data)
-                kong.service.request.set_header(key, encoded_data)
+                local data = string.gmatch(soap_header_raw, "<[^:<>!]*:"..key.."[%s>]+(.*)</[^:<>!]*:"..key..">")()
+
+                -- save security header to ctx map because base64 encoding and kong header breaks the content
+                if string.lower(key) == "security" then
+                    kong.ctx.shared.soapSecurityHeader = data
+                else
+                    local encoded_data = base64.encode(data)
+                    kong.service.request.set_header(key, encoded_data)
+                end
             else
                 kong.service.request.set_header(key, value)
             end
@@ -136,7 +167,25 @@ end --]]
 
 ---[[ convert hex string to string
 local function parseHex(str)
-    return (str:gsub('..', function (cc) return string.char(tonumber(cc, 16)) end))
+    return (
+        str:gsub('..', function (cc)
+            return string.char(tonumber(cc, 16))
+        end
+        )
+    )
+end --]]
+
+---[[ generate random boundary
+local function randomBoundary(length)
+    local characterSet = "abcdefghijklmnopqrstuvwxyz0123456789"
+
+    local output = ""
+    for i = 1, length do
+        local rand = math.random(#characterSet)
+        output = output .. string.sub(characterSet, rand, rand)
+    end
+
+    return output
 end --]]
 
 ---[[ convert SOAP request to REST POST
@@ -146,7 +195,13 @@ local function convertPOST(operation, bodyValue)
     -- Analyse request body
     local body = {}
 
-    if (not operation.rest.request or not operation.rest.request.type or operation.rest.request.type ~= "multipart/mixed") then
+    if (not operation.rest.request or not operation.rest.request.type or string.find(operation.rest.request.type, "multipart/") == nil) then
+        if operation.rest.request ~= nil and operation.rest.request.type ~= nil then
+            kong.log.debug("REST Request Type: "..operation.rest.request.type)
+        else
+            kong.log.debug("REST Request Type: undefined")
+        end
+
         for key, value in pairs(bodyValue) do
             local count
             RequestPath, count = string.gsub(RequestPath, "{"..key.."}", value)
@@ -161,21 +216,30 @@ local function convertPOST(operation, bodyValue)
             end
         end
     else
-        local multipart_data = Multipart({}, "multipart/mixed")
+        kong.log.debug("Sending Multipart")
+        -- set boundary header
+        local multipartContentType = "multipart/form-data; boundary=----------"..randomBoundary(10)
+        kong.service.request.set_header("Content-Type", multipartContentType)
+
+        -- multipart uses boundary header
+        local multipart_data = Multipart(nil, multipartContentType)
 
         if bodyValue.datei ~= nil then
             local hex = bodyValue.datei:gsub(" ", "")
-            local content_type = puremagic.via_content(parseHex(hex))
-            multipart_data:set_simple("datei", bodyValue.datei, "filename.temp", content_type)
+            local data = parseHex(hex)
+            local content_type = puremagic.via_content(data)
+
+            kong.log.debug("Datei Content-Type: "..content_type)
+            multipart_data:set_simple("datei", data, "upload.tmp", content_type)
+
         end
 
         if bodyValue.metadaten ~= nil then
             local metadata = cjson.encode(bodyValue.metadaten)
-            multipart_data:set_simple("metadaten", metadata, "filename.temp", operation.rest.request.encoding.meta)
+            multipart_data:set_simple("metadaten", metadata, "meta.tmp", operation.rest.request.encoding.meta)
         end
 
         body = multipart_data:tostring()
-        body = body:gsub("; filename=\"filename.temp\"", "")
     end
 
     -- Remove unused path params
@@ -186,8 +250,9 @@ local function convertPOST(operation, bodyValue)
     kong.service.request.set_path(RequestPath)
     if (type(body) == "table") then
         body = cjson.encode(body)
-        kong.log.debug("Upstream Body: "..body)
     end
+
+    kong.log.debug("Upstream Body: "..body)
 
     kong.service.request.set_raw_body(body)
 end --]]
@@ -198,7 +263,7 @@ function _M.convert(plugin_conf)
         return "WSDL_FILE"
     end
 
-    local status, soap_header, soap_header_raw, soap_body = pcall(parseBody)
+    local status, soap_header, soap_header_raw, soap_body = pcall(parseBody, plugin_conf)
     if not status then
         kong.log.err("Unable to parse soap request body\n\t", soap_header)
         return nil

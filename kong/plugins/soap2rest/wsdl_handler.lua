@@ -21,17 +21,11 @@
 local xml2lua = require "xml2lua"
 local handler = require "xmlhandler.tree"
 
+local utils = require "kong.plugins.soap2rest.utils"
+
 --local inspect = require "inspect"
 
 local _M = {}
-
----[[ reads the WSDL file
-local function read_file(path)
-    local file = io.open(path, "r")
-    local content = file:read("*a")
-    file:close()
-    return content
-end --]]
 
 ---[[ Parse namespaces
 local function parse_namespaces(raw_schema)
@@ -150,14 +144,13 @@ local function parse_operations(raw_operations, schema)
     return operations
 end --]]
 
----[[ Parse ordered response models
-local function parse_orderd_response_models(complex_types)
+---[[ Parse ordered response models and soap arrays
+local function parse_complexTypes(complex_types)
     local models = {}
-    for _, type in pairs(complex_types) do
-        if type['xs:sequence'] ~= nil
-            and type._attr.name:sub(-#"_InputMessage") ~= "_InputMessage"
-            and type._attr.name:sub(-#"_OutputMessage") ~= "_OutputMessage" then
+    local soap_arrays = {}
 
+    for _, type in pairs(complex_types) do
+        if type['xs:sequence'] ~= nil then
             local attr = {}
             if table.getn(type['xs:sequence']['xs:element']) > 1 then
                 for _, value in pairs(type['xs:sequence']['xs:element']) do
@@ -165,23 +158,32 @@ local function parse_orderd_response_models(complex_types)
                         name = value._attr.name,
                         type = (value._attr.type:sub(1, #"schemas:") == "schemas:" and string.gsub(value._attr.type, "([^:]*:)", "" ) or nil)
                     })
+
+                    if value._attr.maxOccurs ~= nil and value._attr.maxOccurs == "unbounded" and not utils.has_value(soap_arrays, value._attr.name) then
+                        table.insert(soap_arrays, value._attr.name)
+                    end
                 end
             else
+                local value = type['xs:sequence']['xs:element']
                 table.insert(attr, {
-                    name = type['xs:sequence']['xs:element']._attr.name,
-                    type = (type['xs:sequence']['xs:element']._attr.type:sub(1, #"schemas:") == "schemas:" and string.gsub(type['xs:sequence']['xs:element']._attr.type, "([^:]*:)", "" ) or nil)
+                    name = value._attr.name,
+                    type = (value._attr.type:sub(1, #"schemas:") == "schemas:" and string.gsub(value._attr.type, "([^:]*:)", "" ) or nil)
                 })
+
+                if value._attr.maxOccurs ~= nil and value._attr.maxOccurs == "unbounded" and not utils.has_value(soap_arrays, value._attr.name) then
+                    table.insert(soap_arrays, value._attr.name)
+                end
             end
             models[type._attr.name] = attr
         end
     end
-    return models
+    return models, soap_arrays
 end --]]
 
 ---[[ Parse WSDL file
 function _M.parseWSDL(plugin_conf)
     -- read the WSDL file to string
-    local status, wsdl_content = pcall(read_file, plugin_conf.wsdl_path)
+    local status, wsdl_content = pcall(utils.read_file, plugin_conf.wsdl_path)
 
     if not status then
         kong.log.err("Unable to read WSDL file '"..plugin_conf.wsdl_path.."' \n\t", wsdl_content)
@@ -221,14 +223,15 @@ function _M.parseWSDL(plugin_conf)
 
     plugin_conf.operations = operations
 
-    -- Parse response models
-    local status, models = pcall(parse_orderd_response_models, wsdl_handler.root.definitions.types['xs:schema']['xs:complexType'])
+    -- Parse complexTypes
+    local status, models, soap_arrays = pcall(parse_complexTypes, wsdl_handler.root.definitions.types['xs:schema']['xs:complexType'])
     if not status then
-        kong.log.err("Unable to parse WSDL complexType\n\t", operations)
+        kong.log.err("Unable to parse WSDL complexType\n\t", models)
         return
     end
 
     plugin_conf.models = models
+    plugin_conf.soap_arrays = soap_arrays
 end --]]
 
 return _M

@@ -47,137 +47,164 @@ local schema = {
         { config = {
             type = "record",
             fields = {
-                { rest_base_path = {        -- The base path of the rest api.
-                    type = "string",
-                    required = true,
-                    custom_validator = check_rest_base_path,
-                }},
-                { openapi_yaml_path = {     -- The path of the OpenAPI file.
-                    type = "string",
-                    required = true,
-                }},
-                { wsdl_path = {             -- The path of the WSDL file.
-                    type = "string",
-                    required = true,
-                }},
-                { operation_mapping = {     -- Array of json strings.
-                    type = "map",
-                    keys = {
+                {-- The base path of the rest api.
+                    rest_base_path = {
                         type = "string",
+                        required = true,
+                        custom_validator = check_rest_base_path,
                     },
-                    values = {
+                },
+                {-- The path of the OpenAPI file.
+                    openapi_yaml_path = {
                         type = "string",
-                        custom_validator = check_operation_mapping,
+                        required = true,
                     },
-                }},
+                },
+                {-- The path of the WSDL file.
+                    wsdl_path = {
+                        type = "string",
+                        required = true,
+                    },
+                },
+                {-- Array of json strings.
+                    operation_mapping = {
+                        type = "map",
+                        keys = {
+                            type = "string",
+                        },
+                        values = {
+                            type = "string",
+                            custom_validator = check_operation_mapping,
+                        },
+                    },
+                },
 
                 --[[ Cached config data ]]
-                { wsdl_content = {          -- Raw wsdl content
-                    type = "string",
-                }},
-                { namespaces = {            -- Soap namespaces
-                    type = "map",
-                    keys = { type = "string" },
-                    values = { type = "string" },
-                }},
-                { targetNamespace = {       -- targetnamespace shortcut
-                    type = "string",
-                }},
-                { operations = {            -- Operation configutation
-                    type = "map",
-                    keys = { type = "string" },
-                    values = {
-                        type = "record",
-                        fields = {
-                            { rest = {
-                                type = "record",
-                                fields = {
-                                    { action = {
-                                        type = "string",
-                                    }},
-                                    { path = {
-                                        type = "string",
-                                    }},
-                                    { request = {
-                                        type = "record",
-                                        fields = {
-                                            { type = {
-                                                type = "string",
-                                            }},
-                                            { encoding = {
-                                                type = "record",
-                                                fields = {
-                                                    { file = {
-                                                        type = "string",
-                                                    }},
-                                                    { meta = {
-                                                        type = "string",
-                                                    }}
-                                                }
-                                            }}
-                                        }
-                                    }},
-                                    { response = {
-                                        type = "record",
-                                        fields = {
-                                            { type = {
-                                                type = "string",
-                                            }}
-                                        }
-                                    }}
-                                }
-                            }},
-                            { soap = {
-                                type = "record",
-                                fields = {
-                                    { response = {
-                                        type = "string",
-                                    }},
-                                    { fault400 = {
-                                        type = "record",
-                                        fields = {
-                                            { name = {
-                                                type = "string",
-                                            }},
-                                            { type = {
-                                                type = "string",
-                                            }},
-                                        },
-                                    }},
-                                    { fault500 = {
-                                        type = "record",
-                                        fields = {
-                                            { name = {
-                                                type = "string",
-                                            }},
-                                            { type = {
-                                                type = "string",
-                                            }},
-                                        },
-                                    }}
-                                }
-                            }}
-                        }
+                {-- Raw wsdl content
+                    wsdl_content = {
+                        type = "string",
+                    },
+                },
+                {-- Soap namespaces
+                    namespaces = {
+                        type = "map",
+                        keys = { type = "string" },
+                        values = { type = "string" },
+                    },
+                },
+                {-- targetnamespace shortcut
+                    targetNamespace = {
+                        type = "string",
                     }
-                }},
-                { models = {                -- models configutation
-                    type = "map",
-                    keys = { type = "string" },
-                    values = {
-                        type = "array",
-                        elements = {
+                },
+                {-- Operation configutation
+                    operations = {
+                        type = "map",
+                        keys = { type = "string" },
+                        values = {
                             type = "record",
                             fields = {
-                                { name = {
-                                    type = "string",
+                                { rest = {
+                                    type = "record",
+                                    fields = {
+                                        { action = {
+                                            type = "string",
+                                        }},
+                                        { path = {
+                                            type = "string",
+                                        }},
+                                        { request = {
+                                            type = "record",
+                                            fields = {
+                                                { type = {
+                                                    type = "string",
+                                                }},
+                                                { encoding = {
+                                                    type = "record",
+                                                    fields = {
+                                                        { file = {
+                                                            type = "string",
+                                                        }},
+                                                        { meta = {
+                                                            type = "string",
+                                                        }},
+                                                    },
+                                                }},
+                                            },
+                                        }},
+                                        { response = {
+                                            type = "record",
+                                            fields = {
+                                                { type = {
+                                                    type = "string",
+                                                }},
+                                            },
+                                        }},
+                                    },
                                 }},
-                                { type = {
-                                    type = "string",
+                                { soap = {
+                                    type = "record",
+                                    fields = {
+                                        { response = {
+                                            type = "string",
+                                        }},
+                                        { fault400 = {
+                                            type = "record",
+                                            fields = {
+                                                { name = {
+                                                    type = "string",
+                                                }},
+                                                { type = {
+                                                    type = "string",
+                                                }},
+                                            },
+                                        }},
+                                        { fault500 = {
+                                            type = "record",
+                                            fields = {
+                                                { name = {
+                                                    type = "string",
+                                                }},
+                                                { type = {
+                                                    type = "string",
+                                                }},
+                                            },
+                                        }},
+                                    },
                                 }},
                             },
                         },
                     },
-                }}
+                },
+                {-- models configutation
+                    models = {
+                        type = "map",
+                        keys = { type = "string" },
+                        values = {
+                            type = "array",
+                            elements = {
+                                type = "record",
+                                fields = {
+                                    { name = {
+                                        type = "string",
+                                    }},
+                                    { type = {
+                                        type = "string",
+                                    }},
+                                },
+                            },
+                        },
+                    },
+                },
+                {-- Array of soap arrays
+                    soap_arrays = {
+                        type = "array",
+                        default = {},
+                        elements = {
+                            type = "string",
+                        },
+                    },
+                },
             }
         },
         },

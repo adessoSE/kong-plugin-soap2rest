@@ -303,14 +303,14 @@ curl -i -X GET --url http://localhost:8000/v2/pet/1
 curl -i -X POST --url http://localhost:8000/soap-api/v2/ \
     --header "Content-Type: application/xml" \
     --data '<?xml version="1.0" encoding="utf-8"?>
-            <soap:Envelope 
-              xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" 
-              xmlns:tns="http://www.w3.org/2001/XMLSchema">
-              <soap:Body>
-                <tns:GetPetByPetid>
-                  <tns:petId>1</tns:petId>
-                </tns:GetPetByPetid>
-              </soap:Body>
+            <soap:Envelope
+                xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+                xmlns:tns="http://www.w3.org/2001/XMLSchema">
+                <soap:Body>
+                    <tns:GetPetByPetid_InputMessage>
+                        <tns:petId>1</tns:petId>
+                    </tns:GetPetByPetid_InputMessage>
+                </soap:Body>
             </soap:Envelope>'
 ```
 
@@ -321,13 +321,15 @@ curl -i -X POST --url http://localhost:8000/soap-api/v2/ \
   xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
   xmlns:tns="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <tns:Pet>
-      <tns:id>1</tns:id>
-      <tns:name>doggie</tns:name>
-      <tns:photoUrls></tns:photoUrls>
-      <tns:tags></tns:tags>
-      <tns:status>available</tns:status>
-    </tns:Pet>
+    <tns:GetPetByPetid_OutputMessage>
+        <tns:Pet>
+            <tns:id>1</tns:id>
+            <tns:name>doggie</tns:name>
+            <tns:photoUrls></tns:photoUrls>
+            <tns:tags></tns:tags>
+            <tns:status>available</tns:status>
+        </tns:Pet>
+    </tns:GetPetByPetid_OutputMessage>
   </soap:Body>
 </soap:Envelope>
 ```
