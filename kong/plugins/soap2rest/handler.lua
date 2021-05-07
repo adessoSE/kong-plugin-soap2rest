@@ -81,7 +81,7 @@ function soap2rest:header_filter(plugin_conf)
     local RequestAction = kong.request.get_header("X-SOAP-RequestAction")
 
     -- Change response header to SOAP
-    if RequestAction == "WSDL_FILE" or plugin_conf.operations[RequestAction].rest.response.type:sub(-#"json") == "json" then
+    if RequestAction == nil or RequestAction == "WSDL_FILE" or plugin_conf.operations[RequestAction].rest.response.type:sub(-#"json") == "json" then
         kong.response.set_header("Content-Type","application/xml; charset=utf-8")
     else
         kong.response.set_header("Content-Type", plugin_conf.operations[RequestAction].rest.response.type)
@@ -112,8 +112,6 @@ end --]]
 function soap2rest:body_filter(plugin_conf)
     soap2rest.super.body_filter(self)
 
-    local RequestAction = kong.request.get_header("X-SOAP-RequestAction")
-
     -- Clear buffers
     local ctx = ngx.ctx
     if ctx.buffers == nil then
@@ -139,6 +137,7 @@ function soap2rest:body_filter(plugin_conf)
         ctx.nbuffers = next_idx
     end
 
+    local RequestAction = kong.request.get_header("X-SOAP-RequestAction")
     if RequestAction == "WSDL_FILE" then
         ngx.arg[1] = plugin_conf.wsdl_content
     else
@@ -159,7 +158,7 @@ function soap2rest:log(plugin_conf)
 
     local RequestAction = kong.request.get_header("X-SOAP-RequestAction")
 
-    kong.log.debug("SOAP-Request action: '"..RequestAction.."'")
+    kong.log.debug("SOAP-Request action: '"..tostring(RequestAction).."'")
 end --]]
 
 -- return our plugin object

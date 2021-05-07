@@ -43,23 +43,47 @@ end --]]
 
 ---[[ builds sorted xml data
 local function toXml(plugin_conf, objectname, objecttype, object, tab)
-    local xml = tab.."<"..objectname..">\n"
+    local xml = tab.."<"..objectname..">"
+    kong.log.debug("Marshal "..objectname..", "..objecttype)
 
-    if plugin_conf.models[objecttype] ~= nil then
+    if plugin_conf.models[objecttype] ~= nil and next(plugin_conf.models[objecttype]) ~= nil then
+        kong.log.debug(tab.."Marshalling values from model")
+
         for _, value in pairs(plugin_conf.models[objecttype]) do
+            kong.log.debug(value.name.." ("..type(object[value.name])..")")
+
             if value.type ~= nil and type(object[value.name]) == "table" then
                 if object[value.name][1] ~= nil then
                     for _, arrayvalue in pairs(object[value.name]) do
                         xml = xml..toXml(plugin_conf, value.name, value.type, arrayvalue, tab.."  ")
                     end
+
                 else
                     xml = xml..toXml(plugin_conf, value.name, value.type, object[value.name], tab.."  ")
+
                 end
-            else
+
+            elseif object[value.name] ~= nil then
                 kong.log.debug(value.name..": "..tostring(object[value.name]).." ("..type(object[value.name])..")")
                 xml = xml..tab.."  <"..value.name..">"..toXmlValue(object[value.name]).."</"..value.name..">\n"
+
             end
         end
+
+        -- nur bei komplexen strukturen brauchen wir einen zeilenumbruch
+        xml = xml.."\n"
+    elseif object ~= nil and type(object) == "table" then
+        for key, value in pairs(object) do
+            kong.log.debug(tab.."Marshalling object directly: "..key)
+            xml = xml..toXmlValue(tostring(value))
+        end
+
+    elseif object ~= nil then
+        xml = xml..toXmlValue(tostring(object))
+
+    else
+        kong.log.debug(tab.."Null object received")
+
     end
 
     return xml..tab.."</"..objectname..">\n"
@@ -72,12 +96,17 @@ end --]]
 
 ---[[ builds the SOAP fault response
 local function build_SOAP_fault(faultcode, faultstring, detail)
+    if detail == nil then
+        -- nil sieht blöd aus im response
+        detail = ""
+    end
+
     return [[
 <soap:Fault>
 <faultcode>]]..faultcode..[[</faultcode>
 <faultstring xml:lang="en">]]..faultstring..[[</faultstring>
 <detail>
-]]..detail..[[
+]]..tostring(detail)..[[
 </detail>
 </soap:Fault>
 ]]
@@ -86,8 +115,9 @@ end --]]
 ---[[ converts Lua table to XML response
 local function build_XML(plugin_conf, table_response, response_code, RequestAction, targetNamespace, soap)
 
-    if tonumber(string.sub(response_code, 1,1)) == 4 then
+    if tonumber(string.sub(response_code, 1, 1)) == 4 then
         local fault_detail
+
         if soap.fault400 ~= nil then
             local status
             status, fault_detail = pcall(toXml, plugin_conf, soap.fault400.name, soap.fault400.type, table_response, "")
@@ -97,12 +127,17 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
         else
             fault_detail = cjson.encode(table_response)
         end
-        fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" )
+        
+        if fault_detail ~= nil then
+            fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" ) 
+        end
+
         return build_SOAP_fault('soap:Client', 'Client error has occurred', fault_detail)
     end
 
-    if tonumber(string.sub(response_code, 1,1)) == 5 then
+    if tonumber(string.sub(response_code, 1, 1)) == 5 then
         local fault_detail
+        
         if soap.fault500 ~= nil then
             local status
             status, fault_detail = pcall(toXml, plugin_conf, soap.fault500.name, soap.fault500.type, table_response, "")
@@ -112,7 +147,11 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
         else
             fault_detail = cjson.encode(table_response)
         end
-        fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" )
+        
+        if fault_detail ~= nil then
+            fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" )
+        end
+
         return build_SOAP_fault('soap:Server', 'Server error has occurred', fault_detail)
     end
 
@@ -152,14 +191,47 @@ local function build_SOAP(xml_response, namespaces, targetNamespace)
     return soap_response
 end --]]
 
+---[[ convert string to hex string
+local function toHex(str)
+    return (
+        str:gsub('.', function (cc)
+            return string.format("%02x", string.byte(cc))
+        end
+        )
+    )
+end --]]
+
 ---[[ generates the SOAP response
 function _M.generateResponse(plugin_conf, table_response, response_code, RequestAction)
-    kong.log.debug("Response Body: "..table_response)
-    table_response = cjson.decode(table_response)
+    local responseContentType = kong.service.response.get_header("content-type")
+    
+    kong.log.debug("Response Content-Type: "..responseContentType)
+    if responseContentType:find("zip") == nil then
+        -- json dekodieren
+        kong.log.debug("Found JSON response")
+        kong.log.debug("Response Body: "..table_response)
+        
+        -- zahlen als string umbauen, damit keine rundungsfehler auftreten
+        -- das ist im XML nicht unterscheidbar
+        table_response = string.gsub(table_response, "(:+[ ]?)([0-9%.]+)( ?[,}]+)", "%1\"%2\"%3")
+        -- kong.log.debug("After Rounding Protection: "..table_response)
+
+        table_response = cjson.decode(table_response)
+    else
+        -- den rest in hex weil binärdaten
+        kong.log.debug("Found binary response")
+        local hex_response = toHex(table_response)
+
+        kong.log.debug("HEX Response: "..hex_response)
+        table_response = {
+            response = hex_response
+        }
+    end
 
     if type(table_response) == "table" or table_response == nil then
 
         if table_response == nil then
+            kong.log.debug("Empty response found")
             table_response = {}
         end
 

@@ -149,7 +149,9 @@ local function convertGET(operation, bodyValue)
     for key, value in pairs(bodyValue) do
         local count
         RequestPath, count = string.gsub(RequestPath, "{"..key.."}", value)
-        if count == 0 then RequestParams = RequestParams..key.."="..value.."&" end
+        if count == 0 and type(value) ~= "table" then 
+            RequestParams = RequestParams..key.."="..value.."&"
+        end
     end
     RequestParams = string.sub(RequestParams, 1, -2)
 
@@ -157,7 +159,9 @@ local function convertGET(operation, bodyValue)
     RequestPath = string.gsub(RequestPath, '(%/{%w*})', '')
 
     -- Change request path
-    kong.service.request.set_path(RequestPath..RequestParams)
+    local combined_request_path = RequestPath..RequestParams
+    kong.log.debug("Combined Request Path: "..combined_request_path)
+    kong.service.request.set_path(combined_request_path)
 
     -- Change request header to REST
     kong.service.request.set_raw_body("")

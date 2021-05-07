@@ -55,9 +55,10 @@ local function parse_schema(raw_schema)
     -- parse OutputMessage type
     local types = {}
     for key, value in pairs(raw_schema['xs:complexType']) do
-        if value._attr.name:sub(-#'_OutputMessage') == '_OutputMessage'then
+        if value._attr.name:sub(-#'_OutputMessage') == '_OutputMessage' then
             if value['xs:sequence'] ~= nil and value['xs:sequence']['xs:element'] ~= nil then
-                if value['xs:sequence']['xs:element']._attr.type ~= nil then
+                -- xs typen sind basis werte
+                if value['xs:sequence']['xs:element']._attr.type ~= nil and value['xs:sequence']['xs:element']._attr.type:find('^xs:') == nil then
                     types[value._attr.name] = value['xs:sequence']['xs:element']._attr.type:gsub("schemas:", "")
                 else
                     types[value._attr.name] = value['xs:sequence']['xs:element']._attr.name
@@ -75,12 +76,10 @@ local function parse_schema(raw_schema)
     -- parse request type
     local schema = {}
     for key, value in pairs(raw_schema['xs:element']) do
-        if value._attr.name:sub(-#'_InputMessage') ~= '_InputMessage' then
-            if value._attr.name:sub(-#'_OutputMessage') == '_OutputMessage'  then
-                schema[value._attr.name] = types[value._attr.name]
-            else
-                schema[value._attr.name] = (value._attr.type ~= nil and value._attr.type:gsub("schemas:", "") or value._attr.name)
-            end
+        if value._attr.name:sub(-#'_OutputMessage') == '_OutputMessage'  then
+            schema[value._attr.name] = types[value._attr.name]
+        elseif value._attr.name:sub(-#'_InputMessage') ~= '_InputMessage' then
+            schema[value._attr.name] = (value._attr.type ~= nil and value._attr.type:gsub("schemas:", "") or value._attr.name)
         end
     end
 
