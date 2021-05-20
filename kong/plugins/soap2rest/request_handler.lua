@@ -22,6 +22,7 @@ local cjson = require "cjson.safe"
 local xml2lua = require "xml2lua"
 local handler = require "xmlhandler.tree"
 local base64 = require "base64"
+local urlencode = require 'urlencode'
 local Multipart = require "multipart"
 
 local utils = require "kong.plugins.soap2rest.utils"
@@ -68,6 +69,41 @@ local function convertValues(plugin_conf, table, ebene)
     end
 end --]]
 
+---[[ parse XML namespaces to Lua table
+local function parseNamespaces(xml_request)
+    local xmlNamespaces = {}
+    for key, value in string.gmatch(xml_request, 'xmlns:([^=]*)="([^"]*)"') do
+        kong.log.debug("Register Namespace: "..key.."="..value)
+        xmlNamespaces[key] = "xmlns:"..key.."=\""..value.."\""
+    end
+
+    kong.ctx.shared.xmlNamespaces = xmlNamespaces
+end --]]
+
+---[[ parse XML namespaces to Lua table
+local function getNamespace(namespaceName)
+    return kong.ctx.shared.xmlNamespaces[namespaceName]
+end --]]
+
+---[[ get the referenced namespaces
+local function referencedNamespacesAsString(xml_data)
+    local namespaces = {}
+    for namespaceName in string.gmatch(xml_data, '<([^/:]*):') do
+        namespaces[namespaceName] = getNamespace(namespaceName)
+    end
+
+    local namespaceString = ""
+    for key, namespace in pairs(namespaces) do
+        if namespace ~= nil then
+            namespaceString = namespaceString.." "..namespace
+        else
+            kong.log.debug("Namespace "..key.." not found")
+        end
+    end
+
+    return namespaceString
+end --]]
+
 ---[[ parse SOAP request body to Lua table
 local function parseBody(plugin_conf)
     local xml_request, msg = kong.request.get_raw_body()
@@ -84,6 +120,7 @@ local function parseBody(plugin_conf)
         end
     end
 
+    parseNamespaces(xml_request)
     local soap_header_raw = string.gmatch(xml_request, '<[^:<>!]*:Header[%s>].*</[^:<>!]*:Header>')()
 
     -- Removed namespace shortname from XML request
@@ -123,10 +160,17 @@ local function convertHeader(soap_header, soap_header_raw, operation)
     if soap_header ~= nil then
         for key, value in pairs(soap_header) do
             if type(value) == "table" then
-                local data = string.gmatch(soap_header_raw, "<[^:<>!]*:"..key.."[%s>]+(.*)</[^:<>!]*:"..key..">")()
+                local data = string.gmatch(soap_header_raw, "<[^:<>!]*:"..key.."[^>]*>(.*)</[^:<>!]*:"..key..">")()
 
                 -- save security header to ctx map because base64 encoding and kong header breaks the content
                 if string.lower(key) == "security" then
+                    -- alle namespace namen abrufen 
+                    local namespaces = referencedNamespacesAsString(data)
+                    kong.log.debug("Namespaces für Header: "..namespaces)
+
+                    -- am ersten xml element registrieren
+                    data = string.gsub(data, "^[ \r\n]*<([^:<>!]*:[^%s>]*)[^>]*>", "<%1 "..namespaces..">")
+
                     kong.ctx.shared.soapSecurityHeader = data
                 else
                     local encoded_data = base64.encode(data)
@@ -149,8 +193,8 @@ local function convertGET(operation, bodyValue)
     for key, value in pairs(bodyValue) do
         local count
         RequestPath, count = string.gsub(RequestPath, "{"..key.."}", value)
-        if count == 0 and type(value) ~= "table" then 
-            RequestParams = RequestParams..key.."="..value.."&"
+        if count == 0 and type(value) ~= "table" then
+            RequestParams = RequestParams..key.."="..urlencode.encode_url(value).."&"
         end
     end
     RequestParams = string.sub(RequestParams, 1, -2)

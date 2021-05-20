@@ -89,7 +89,7 @@ function soap2rest:header_filter(plugin_conf)
     kong.response.clear_header("Content-Length")
 
     -- Change all client errors to error code 400
-    if tonumber(string.sub(kong.response.get_status(), 1,1)) == 4 then
+    if kong.response.get_status() ~= 401 and tonumber(string.sub(kong.response.get_status(), 1,1)) == 4 then
         kong.response.set_status(400)
     end
 
@@ -102,8 +102,10 @@ function soap2rest:header_filter(plugin_conf)
     if RequestAction == "WSDL_FILE" then
         if plugin_conf.wsdl_content ~= nil then
             kong.response.set_status(200)
-        else
+
+        elseif kong.response.get_status() ~= 401 then
             kong.response.set_status(400)
+
         end
     end
 end --]]

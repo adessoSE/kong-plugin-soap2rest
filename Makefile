@@ -1,4 +1,4 @@
-DEV_ROCKS = busted "lua-cjson 2.1.0.6-1" "xml2lua 1.4-3" "lyaml 6.2.7-1" "multipart 0.5.9-1" "base64 1.5-3" "luacov 0.12.0" "busted" "luacheck" "luacov" "luacov-console" "lua-llthreads2"
+DEV_ROCKS = busted "lua-cjson 2.1.0.6-1" "xml2lua 1.4-3" "lyaml 6.2.7-1" "multipart 0.5.9-1" "base64 1.5-3" "urlencode 0.0.2-0" "luacov 0.12.0" "busted" "luacheck" "luacov" "luacov-console" "lua-llthreads2"
 PLUGIN_NAME := kong-plugin-soap2rest
 
 .PHONY: install uninstall dev lint test test-integration test-plugins test-all clean

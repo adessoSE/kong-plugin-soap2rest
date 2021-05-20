@@ -23,6 +23,7 @@ dependencies = {
   "lyaml >= 6.2.7-1",
   "multipart >= 0.5.9-1",
   "base64 >= 1.5-3",
+  "urlencode >= 0.0.2-0",
 }
 
 build = {

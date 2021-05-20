@@ -129,7 +129,9 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
         end
         
         if fault_detail ~= nil then
-            fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" ) 
+            fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" )
+        else
+            fault_detail = "HTTP Code: "..response_code
         end
 
         return build_SOAP_fault('soap:Client', 'Client error has occurred', fault_detail)
@@ -217,7 +219,7 @@ function _M.generateResponse(plugin_conf, table_response, response_code, Request
         -- kong.log.debug("After Rounding Protection: "..table_response)
 
         table_response = cjson.decode(table_response)
-    else
+    elseif table_response ~= nil and table_response ~= "" then
         -- den rest in hex weil binärdaten
         kong.log.debug("Found binary response")
         local hex_response = toHex(table_response)
