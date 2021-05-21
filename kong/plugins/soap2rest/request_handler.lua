@@ -22,7 +22,6 @@ local cjson = require "cjson.safe"
 local xml2lua = require "xml2lua"
 local handler = require "xmlhandler.tree"
 local base64 = require "base64"
-local urlencode = require 'urlencode'
 local Multipart = require "multipart"
 
 local utils = require "kong.plugins.soap2rest.utils"
@@ -193,8 +192,8 @@ local function convertGET(operation, bodyValue)
     for key, value in pairs(bodyValue) do
         local count
         RequestPath, count = string.gsub(RequestPath, "{"..key.."}", value)
-        if count == 0 and type(value) ~= "table" then
-            RequestParams = RequestParams..key.."="..urlencode.encode_url(value).."&"
+        if count == 0 and type(value) ~= "table" then 
+            RequestParams = RequestParams..key.."="..ngx.escape_uri(value).."&"
         end
     end
     RequestParams = string.sub(RequestParams, 1, -2)
