@@ -63,7 +63,7 @@ local function toXml(plugin_conf, objectname, objecttype, object, tab)
 
                 end
 
-            elseif object[value.name] ~= nil then
+            elseif object[value.name] ~= nil and object[value.name] ~= cjson.null then
                 kong.log.debug(value.name..": "..tostring(object[value.name]).." ("..type(object[value.name])..")")
                 xml = xml..tab.."  <"..value.name..">"..toXmlValue(object[value.name]).."</"..value.name..">\n"
 
@@ -112,6 +112,19 @@ local function build_SOAP_fault(faultcode, faultstring, detail)
 ]]
 end --]]
 
+---[[ add the tns to the root element
+local function addTargetNamespacePrefixToRootElement(xml, targetNamespace)
+    if xml ~= nil then
+        -- start tag
+        xml = string.gsub( xml, "^[ \r\n]*<", "<"..targetNamespace..":" )
+
+        -- end tag
+        xml = string.gsub( xml, "</([^:<>!]*)>[ \r\n]*$", "</"..targetNamespace..":%1>" )
+    end
+
+    return xml
+end --]]
+
 ---[[ converts Lua table to XML response
 local function build_XML(plugin_conf, table_response, response_code, RequestAction, targetNamespace, soap)
 
@@ -127,9 +140,9 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
         else
             fault_detail = cjson.encode(table_response)
         end
-        
+
         if fault_detail ~= nil then
-            fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" )
+            fault_detail = addTargetNamespacePrefixToRootElement(fault_detail, targetNamespace)
         else
             fault_detail = "HTTP Code: "..response_code
         end
@@ -139,7 +152,7 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
 
     if tonumber(string.sub(response_code, 1, 1)) == 5 then
         local fault_detail
-        
+
         if soap.fault500 ~= nil then
             local status
             status, fault_detail = pcall(toXml, plugin_conf, soap.fault500.name, soap.fault500.type, table_response, "")
@@ -149,9 +162,9 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
         else
             fault_detail = cjson.encode(table_response)
         end
-        
+
         if fault_detail ~= nil then
-            fault_detail = string.gsub( fault_detail, "(<%/?)", "%1"..targetNamespace..":" )
+            fault_detail = addTargetNamespacePrefixToRootElement(fault_detail, targetNamespace)
         end
 
         return build_SOAP_fault('soap:Server', 'Server error has occurred', fault_detail)
@@ -164,17 +177,17 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
     end
 
     xml_response = [[
-<]]..RequestAction.."_OutputMessage"..[[>
+<]]..targetNamespace..":"..RequestAction.."_OutputMessage"..[[>
 ]]..xml_response..[[
-</]]..RequestAction.."_OutputMessage"..[[>
+</]]..targetNamespace..":"..RequestAction.."_OutputMessage"..[[>
 ]]
 
     -- Add namespace shortname to xml response
-    return string.gsub(xml_response, "(<+%/?)([%w_]*)( ?%/?>+)", "%1"..targetNamespace..":%2%3")
+    return xml_response
 end --]]
 
 ---[[ builds the SOAP response
-local function build_SOAP(xml_response, namespaces, targetNamespace)
+local function build_SOAP(xml_response, namespaces)
     -- Insert XML response to SOAP template
     local soap_response = [[
 <?xml version="1.0" encoding="UTF-8"?>
@@ -206,17 +219,16 @@ end --]]
 ---[[ generates the SOAP response
 function _M.generateResponse(plugin_conf, table_response, response_code, RequestAction)
     local responseContentType = kong.service.response.get_header("content-type")
-    
+
     kong.log.debug("Response Content-Type: "..responseContentType)
     if responseContentType:find("zip") == nil then
         -- json dekodieren
         kong.log.debug("Found JSON response")
         kong.log.debug("Response Body: "..table_response)
-        
+
         -- zahlen als string umbauen, damit keine rundungsfehler auftreten
         -- das ist im XML nicht unterscheidbar
         table_response = string.gsub(table_response, "(:+[ ]?)([0-9%.]+)( ?[,}]+)", "%1\"%2\"%3")
-        -- kong.log.debug("After Rounding Protection: "..table_response)
 
         table_response = cjson.decode(table_response)
     elseif table_response ~= nil and table_response ~= "" then
@@ -243,7 +255,7 @@ function _M.generateResponse(plugin_conf, table_response, response_code, Request
             return table_response
         end
 
-        local status, soap_response = pcall(build_SOAP, xml_response, plugin_conf.namespaces, plugin_conf.targetNamespace)
+        local status, soap_response = pcall(build_SOAP, xml_response, plugin_conf.namespaces)
         if not status then
             kong.log.err("Unable to build SOAP response\n\t", soap_response)
         else

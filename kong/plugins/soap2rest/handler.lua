@@ -88,9 +88,10 @@ function soap2rest:header_filter(plugin_conf)
     end
     kong.response.clear_header("Content-Length")
 
-    -- Change all client errors to error code 400
+    kong.ctx.shared.restHttpStatus = kong.response.get_status()
+    -- Change all client errors to status code 200 because otherwise SOAP faults are ignored by most frameworks
     if kong.response.get_status() ~= 401 and tonumber(string.sub(kong.response.get_status(), 1,1)) == 4 then
-        kong.response.set_status(400)
+        kong.response.set_status(200)
     end
 
     -- Change all server errors to error code 500
@@ -144,7 +145,7 @@ function soap2rest:body_filter(plugin_conf)
         ngx.arg[1] = plugin_conf.wsdl_content
     else
         local table_response = table.concat(ngx.ctx.buffers)
-        local response_code = kong.response.get_status()
+        local response_code = kong.ctx.shared.restHttpStatus
         local status, soap_response = pcall(response_handler.generateResponse, plugin_conf, table_response, response_code, RequestAction)
         if status then
             ngx.arg[1] = soap_response
