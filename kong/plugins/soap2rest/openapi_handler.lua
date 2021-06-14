@@ -26,7 +26,11 @@ local utils = require "kong.plugins.soap2rest.utils"
 
 local _M = {}
 
----[[ builds REST request path
+-- Builds the REST request path
+-- @param plugin_conf Plugin configuration
+-- @param RequestAction SOAP OperationId
+-- @retrun  1. HTTP-Action
+--          2. REST-Request path
 local function getRequestPath(plugin_conf, RequestAction)
     local action, RequestPath= "", ""
     for word in string.gmatch(RequestAction, "%u%l*") do
@@ -45,14 +49,19 @@ local function getRequestPath(plugin_conf, RequestAction)
     end
 
     return action, plugin_conf.rest_base_path..RequestPath
-end --]]
+end
 
----[[ Parse operation
+-- Identifying the content type of the request and response of a REST operation
+-- @param operationName OperationId
+-- @param operation Excerpt from the OpenAPI
+-- @retrun  1. Content-Type of the request
+--          2. Content-Type of the response
 local function parseOperation(operationName, operation)
     local request, response = {type = "application/json"}, {type = "application/json"}
     if operation.requestBody ~= nil then
         kong.log.debug("Parsing body of the operation: "..operationName)
 
+        -- Identification of the content type of the request
         if operation["x-contentType"] ~= nil then
             kong.log.debug("Found x-contenttype")
             request.type = operation["x-contentType"]
@@ -61,6 +70,7 @@ local function parseOperation(operationName, operation)
             kong.log.debug("Use plain content: "..request.type)
         end
 
+        -- Identification of the encoding if it is a file
         if string.find(request.type, "multipart/") ~= nil then
             kong.log.debug("Found Multipart: "..request.type)
             local encoding = operation.requestBody.content[request.type].encoding
@@ -74,6 +84,7 @@ local function parseOperation(operationName, operation)
     end
     kong.log.debug("Request Type: "..request.type)
 
+    -- Identification of the content type of the response
     if (operation.responses ~= nil and operation.responses["200"] ~= nil) then
         response.type = next(operation.responses["200"].content)
     elseif (operation.responses ~= nil and operation.responses[200] ~= nil) then
@@ -82,10 +93,26 @@ local function parseOperation(operationName, operation)
     kong.log.debug("Response Type: "..response.type)
 
     return request, response
-end --]]
+end
 
----[[ Parse openapi
-local function parseOpenAPI(plugin_conf, openapi_table)
+-- Analysing the OpenAPI file
+-- @param plugin_conf Plugin configuration
+function _M.parse(plugin_conf)
+    -- Reading out the OpenAPI file
+    local status, yaml_content = pcall(utils.read_file, plugin_conf.openapi_yaml_path)
+    if not status then
+        kong.log.err("Unable to read OpenAPI file '"..plugin_conf.openapi_yaml_path.."' \n\t", yaml_content)
+        return
+    end
+
+    -- Converting the OpenAPI file into a Lua table
+    local status, openapi_table = pcall(lyaml.load, yaml_content)
+    if not status then
+        kong.log.err("Unable to parse OpenAPI yaml\n\t", openapi_table)
+        return
+    end
+
+    -- Completing the cached plugin configuration
     for requestAction, operation in pairs(plugin_conf.operations) do
         local action, path = getRequestPath(plugin_conf, requestAction)
 
@@ -112,25 +139,6 @@ local function parseOpenAPI(plugin_conf, openapi_table)
             end
         end
     end
-end --]]
-
----[[ Parse OpenAPI file
-function _M.parseOpenAPI(plugin_conf)
-    -- read the OpenAPI file to string
-    local status, yaml_content = pcall(utils.read_file, plugin_conf.openapi_yaml_path)
-    if not status then
-        kong.log.err("Unable to read OpenAPI file '"..plugin_conf.openapi_yaml_path.."' \n\t", yaml_content)
-        return
-    end
-
-    -- convert the OpenAPI yaml to table
-    local status, openapi_table = pcall(lyaml.load, yaml_content)
-    if not status then
-        kong.log.err("Unable to parse OpenAPI yaml\n\t", openapi_table)
-        return
-    end
-
-    parseOpenAPI(plugin_conf, openapi_table)
-end --]]
+end
 
 return _M

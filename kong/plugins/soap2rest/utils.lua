@@ -22,7 +22,9 @@
 
 local _M = {}
 
----[[ reads a file
+-- Reading a file
+-- @param path path of the file
+-- @return content of the file
 function _M.read_file(path)
     local file = io.open(path, "r")
     local content = file:read("*a")
@@ -30,17 +32,20 @@ function _M.read_file(path)
     return content
 end --]]
 
----[[ checks if table contains value
-function _M.has_value (tab, val)
-    if tab ~= nil then
-        for index, value in ipairs(tab) do
-            if value == val then
+-- Checking whether an array contains an object
+-- @param array Lua Array
+-- @param object Objekt
+-- @return boolean
+function _M.has_value (array, object)
+    if array ~= nil then
+        for index, value in ipairs(array) do
+            if value == object then
                 return true
             end
         end
     end
 
     return false
-end --]]
+end
 
 return _M

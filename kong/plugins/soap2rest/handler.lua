@@ -36,28 +36,34 @@ local openapi_handler = require "kong.plugins.soap2rest.openapi_handler"
 
 local soap2rest = BasePlugin:extend()
 
-soap2rest.PRIORITY = 2001 -- set the plugin priority, which determines plugin execution order
+-- set the plugin priority, which determines plugin execution order (Default: 2001)
+soap2rest.PRIORITY = 2001
 soap2rest.VERSION = "1.0.2-1"
 
----[[ runs in the 'access_by_lua_block'
+-- Processing of incoming requests
+-- runs in the 'access_by_lua_block'
+-- @param plugin_conf Plugin configuration
 function soap2rest:access(plugin_conf)
     soap2rest.super.access(self)
 
-    -- log all http headers
+    -- Logging of all HTTP headers
     local headers = kong.request.get_headers()
     for key, value in pairs(headers) do
         kong.log.debug("Header: " .. key .. "; Value: " .. value)
     end
 
+    -- Automatic configuration if it has not yet been executed.
     if plugin_conf.operations == nil then
-        local status, msg = pcall(wsdl_handler.parseWSDL, plugin_conf)
+        -- Automatic configuration using the WSDL file
+        local status, msg = pcall(wsdl_handler.parse, plugin_conf)
         if status then
             kong.log.debug("Successfully parsed WSDL file")
         else
             kong.log.err(msg)
         end
 
-        local status, msg = pcall(openapi_handler.parseOpenAPI, plugin_conf)
+        -- Automatic configuration using the OpenAPI file
+        local status, msg = pcall(openapi_handler.parse, plugin_conf)
         if status then
             kong.log.debug("Successfully parsed OpenAPI file")
         else
@@ -65,16 +71,19 @@ function soap2rest:access(plugin_conf)
         end
     end
 
+    -- Processing the SOAP request
     local status, requestAction = pcall(request_handler.convert, plugin_conf)
     if status then
+        -- Storing the SAOP OperationId in the HTTP header of the REST request
         kong.service.request.set_header("X-SOAP-RequestAction", requestAction)
     else
         kong.log.err(requestAction)
     end
-end --]]
+end
 
-
----[[ runs in the 'header_filter_by_lua_block'
+-- Processing the header of the outgoing response
+-- runs in the 'header_filter_by_lua_block'
+-- @param plugin_conf Plugin configuration
 function soap2rest:header_filter(plugin_conf)
     soap2rest.super.header_filter(self)
 
@@ -89,8 +98,9 @@ function soap2rest:header_filter(plugin_conf)
     kong.response.clear_header("Content-Length")
 
     kong.ctx.shared.restHttpStatus = kong.response.get_status()
-    -- Change all client errors to status code 200 because otherwise SOAP faults are ignored by most frameworks
-    if kong.response.get_status() ~= 401 and tonumber(string.sub(kong.response.get_status(), 1,1)) == 4 then
+    -- Change all client errors to status code 200, as SOAP errors are otherwise ignored by most frameworks.
+    -- Unauthorized (401) and Forbidden (403) passed directly
+    if kong.response.get_status() ~= 401 and kong.response.get_status() ~= 403 and tonumber(string.sub(kong.response.get_status(), 1,1)) == 4 then
         kong.response.set_status(200)
     end
 
@@ -109,13 +119,15 @@ function soap2rest:header_filter(plugin_conf)
 
         end
     end
-end --]]
+end
 
----[[ runs in the 'body_filter_by_lua_block'
+-- Processing the body of the outgoing response
+-- runs in the 'body_filter_by_lua_block'
+-- @param plugin_conf Plugin configuration
 function soap2rest:body_filter(plugin_conf)
     soap2rest.super.body_filter(self)
 
-    -- Clear buffers
+    -- Clear nginx buffers
     local ctx = ngx.ctx
     if ctx.buffers == nil then
         ctx.buffers = {}
@@ -131,7 +143,6 @@ function soap2rest:body_filter(plugin_conf)
         if data then
             ctx.buffers[next_idx] = data
             ctx.nbuffers = next_idx
-            -- Send nothing to the client yet.
             ngx.arg[1] = nil
         end
         return
@@ -141,11 +152,15 @@ function soap2rest:body_filter(plugin_conf)
     end
 
     local RequestAction = kong.request.get_header("X-SOAP-RequestAction")
+
+    -- Query whether the request is the WSDL
     if RequestAction == "WSDL_FILE" then
         ngx.arg[1] = plugin_conf.wsdl_content
     else
         local table_response = table.concat(ngx.ctx.buffers)
         local response_code = kong.ctx.shared.restHttpStatus
+
+        -- Generating a SOAP response from the REST response
         local status, soap_response = pcall(response_handler.generateResponse, plugin_conf, table_response, response_code, RequestAction)
         if status then
             ngx.arg[1] = soap_response
@@ -153,16 +168,17 @@ function soap2rest:body_filter(plugin_conf)
             kong.log.err(RequestAction.." ", soap_response)
         end
     end
-end --]]
+end
 
----[[ runs in the 'log_by_lua_block'
+-- Logging of each request via the plugin
+-- runs in the 'log_by_lua_block'
+-- @param plugin_conf Plugin configuration
 function soap2rest:log(plugin_conf)
     soap2rest.super.log(self)
 
     local RequestAction = kong.request.get_header("X-SOAP-RequestAction")
 
     kong.log.debug("SOAP-Request action: '"..tostring(RequestAction).."'")
-end --]]
+end
 
--- return our plugin object
 return soap2rest

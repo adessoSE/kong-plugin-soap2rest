@@ -20,9 +20,11 @@
 
 local typedefs = require "kong.db.schema.typedefs"
 
--- Grab pluginname from module name
 local plugin_name = ({...})[1]:match("^kong%.plugins%.([^%.]+)")
 
+-- Check whether the REST API path begins and ends with a '/'.
+-- @param value Path to the REST API
+-- @return boolean
 local function check_rest_base_path(value)
     if value ~= "/" and not string.match(value, '^/.*/$') then
         return false, "must starts and ends with '/'"
@@ -31,6 +33,9 @@ local function check_rest_base_path(value)
     return true
 end
 
+-- Check that the specified path does not begin with a '/'.
+-- @param value REST API Path of the Operation Mapping
+-- @return boolean
 local function check_operation_mapping(value)
     if string.match(value, '^/.*') then
         return false, "rest path must never begin with '/'"
@@ -42,31 +47,33 @@ end
 local schema = {
     name = plugin_name,
     fields = {
-        { consumer = typedefs.no_consumer },  -- this plugin cannot be configured on a consumer (typical for auth plugins)
+        { consumer = typedefs.no_consumer },  -- This plugin cannot be configured as a 'consumer'.
         { protocols = typedefs.protocols_http },
         { config = {
             type = "record",
             fields = {
-                {-- The base path of the rest api.
+                {-- Path to the linked REST API.
                     rest_base_path = {
                         type = "string",
                         required = true,
                         custom_validator = check_rest_base_path,
                     },
                 },
-                {-- The path of the OpenAPI file.
+                {-- Path to the OpenAPI file of the REST API.
                     openapi_yaml_path = {
                         type = "string",
                         required = true,
                     },
                 },
-                {-- The path of the WSDL file.
+                {-- Path to the WSDL file of the SOAP API.
                     wsdl_path = {
                         type = "string",
                         required = true,
                     },
                 },
-                {-- Array of json strings.
+                {-- SOAP Operation Mappings
+                    -- @key:    SOAP OperationId
+                    -- @value:  REST Path with parameter
                     operation_mapping = {
                         type = "map",
                         keys = {
@@ -79,25 +86,35 @@ local schema = {
                     },
                 },
 
-                --[[ Cached config data ]]
-                {-- Raw wsdl content
+                ------------------------------------------------------------------------------
+                -- Cached configuration of the plugin
+                ------------------------------------------------------------------------------
+                -- IMPORTANT:   Do not configure these parameters via Kong, as they are
+                --              automatically generated from the WSDL and the OpenAPI!
+                ------------------------------------------------------------------------------
+
+                {-- Content of the WSDL file
                     wsdl_content = {
                         type = "string",
                     },
                 },
-                {-- Soap namespaces
+                {-- SOAP Namespaces Mapping
+                    -- @key:    SOAP Namespace acronym
+                    -- @value:  SOAP Namespace URL
                     namespaces = {
                         type = "map",
                         keys = { type = "string" },
                         values = { type = "string" },
                     },
                 },
-                {-- targetnamespace shortcut
+                {-- Target Namespace acronym (e.g. 'tns')
                     targetNamespace = {
                         type = "string",
                     }
                 },
-                {-- Operation configutation
+                {-- Configuration of the SOAP operations
+                    -- @key:    SOAP OperationId
+                    -- @value:  Interfaces Definition of the SOAP and REST APIs
                     operations = {
                         type = "map",
                         keys = { type = "string" },
@@ -176,7 +193,8 @@ local schema = {
                         },
                     },
                 },
-                {-- models configutation
+                {-- Configuration of the return types
+                 -- Used to return the attributes in the SOAP responses in the correct order.
                     models = {
                         type = "map",
                         keys = { type = "string" },
@@ -196,7 +214,7 @@ local schema = {
                         },
                     },
                 },
-                {-- Array of soap arrays
+                {-- Collection of the names of all SOAP arrays
                     soap_arrays = {
                         type = "array",
                         default = {},

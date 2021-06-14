@@ -24,7 +24,9 @@ local cjson = require "cjson.safe"
 
 local _M = {}
 
----[[ convert value to xml compatible value. bad signs are escaped
+-- Convert value to xml-compatible value. Bad characters are escaped
+-- @param simpleValue Input value
+-- @return Input value as XML entry
 local function toXmlValue(simpleValue)
     local xmlValue
     if simpleValue ~= nil and simpleValue ~= cjson.null then
@@ -39,9 +41,15 @@ local function toXmlValue(simpleValue)
     end
 
     return xmlValue
-end --]]
+end
 
----[[ builds sorted xml data
+-- Create the sorted XML object
+-- @param plugin_conf Plugin configuration
+-- @param objectname Name of the object entry
+-- @param objecttype Type of object entry
+-- @param object object entry
+-- @param tab Tabulator for structuring the XML
+-- @return XML string of the object entry
 local function toXml(plugin_conf, objectname, objecttype, object, tab)
     local xml = tab.."<"..objectname..">"
     kong.log.debug("Marshal "..objectname..", "..objecttype)
@@ -70,7 +78,7 @@ local function toXml(plugin_conf, objectname, objecttype, object, tab)
             end
         end
 
-        -- nur bei komplexen strukturen brauchen wir einen zeilenumbruch
+        -- only with complex structures do we need a line break
         xml = xml.."\n"
     elseif object ~= nil and type(object) == "table" then
         for key, value in pairs(object) do
@@ -87,17 +95,25 @@ local function toXml(plugin_conf, objectname, objecttype, object, tab)
     end
 
     return xml..tab.."</"..objectname..">\n"
-end --]]
+end
 
----[[ builds sorted xml data
+-- Create the sorted XML object
+-- @param plugin_conf Plugin configuration
+-- @param objecttype Type of object entry
+-- @param object object entry
+-- @return XML string of the object entry
 local function toSortedXml(plugin_conf, objecttype, object)
     return toXml(plugin_conf, objecttype, objecttype, object, "")
-end --]]
+end
 
----[[ builds the SOAP fault response
+-- Replacing a SOAP Fault Response
+-- @param faultcode Error code (Client/Server)
+-- @param faultstring Error name
+-- @param detail Error description
+-- @return Fault as XML string
 local function build_SOAP_fault(faultcode, faultstring, detail)
     if detail == nil then
-        -- nil sieht blöd aus im response
+        -- replace 'nil' in the answer
         detail = ""
     end
 
@@ -110,9 +126,12 @@ local function build_SOAP_fault(faultcode, faultstring, detail)
 </detail>
 </soap:Fault>
 ]]
-end --]]
+end
 
----[[ add the tns to the root element
+-- Adding the Target Namespace Abbreviation
+-- @param xml SAOP Body without Target Namespace
+-- @param targetNamespace Target Namespace Abbreviation
+-- @return SAOP Body mit Target Namespace
 local function addTargetNamespacePrefixToRootElement(xml, targetNamespace)
     if xml ~= nil then
         -- start tag
@@ -123,11 +142,19 @@ local function addTargetNamespacePrefixToRootElement(xml, targetNamespace)
     end
 
     return xml
-end --]]
+end
 
----[[ converts Lua table to XML response
+-- Conversion of the body as a Lua table to the SOAP body
+-- @param plugin_conf Plugin configuration
+-- @param table_response Body as Lua table
+-- @param response_code HTTP response code
+-- @param RequestAction OperationId
+-- @param targetNamespace Target Namespace Abbreviation
+-- @param soap Operation Mapping
+-- @return SOAP Body as XML String
 local function build_XML(plugin_conf, table_response, response_code, RequestAction, targetNamespace, soap)
 
+    -- Interception of Client Errors
     if tonumber(string.sub(response_code, 1, 1)) == 4 then
         local fault_detail
 
@@ -150,6 +177,7 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
         return build_SOAP_fault('soap:Client', 'Client error has occurred', fault_detail)
     end
 
+    -- Interception of Server Errors
     if tonumber(string.sub(response_code, 1, 1)) == 5 then
         local fault_detail
 
@@ -170,7 +198,7 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
         return build_SOAP_fault('soap:Server', 'Server error has occurred', fault_detail)
     end
 
-    -- Convert response to XML
+    -- Create the sorted XML object
     local status, xml_response = pcall(toSortedXml, plugin_conf, soap.response, table_response)
     if not status then
         error("Unable to build xml response\n\t", xml_response)
@@ -182,11 +210,13 @@ local function build_XML(plugin_conf, table_response, response_code, RequestActi
 </]]..targetNamespace..":"..RequestAction.."_OutputMessage"..[[>
 ]]
 
-    -- Add namespace shortname to xml response
     return xml_response
-end --]]
+end
 
----[[ builds the SOAP response
+-- Creating the SOAP response
+-- @param xml_response SOAP Body as XML String
+-- @param namespaces Necessary namespaces
+-- @return SOAP response as XML string
 local function build_SOAP(xml_response, namespaces)
     -- Insert XML response to SOAP template
     local soap_response = [[
@@ -204,9 +234,11 @@ local function build_SOAP(xml_response, namespaces)
 </soap:Envelope>]]
 
     return soap_response
-end --]]
+end
 
----[[ convert string to hex string
+-- Converting a String to a Hex String
+-- @param str String
+-- @return Hex String
 local function toHex(str)
     return (
         str:gsub('.', function (cc)
@@ -214,25 +246,30 @@ local function toHex(str)
         end
         )
     )
-end --]]
+end
 
----[[ generates the SOAP response
+-- Generating the SOAP Response
+-- @param plugin_conf Plugin configuration
+-- @param table_response REST response
+-- @param response_code REST response code
+-- @param RequestAction OperationId
+-- @return SOAP response as XML string
 function _M.generateResponse(plugin_conf, table_response, response_code, RequestAction)
     local responseContentType = kong.service.response.get_header("content-type")
 
     kong.log.debug("Response Content-Type: "..responseContentType)
     if responseContentType:find("zip") == nil then
-        -- json dekodieren
+        -- Decode JSON
         kong.log.debug("Found JSON response")
         kong.log.debug("Response Body: "..table_response)
 
-        -- zahlen als string umbauen, damit keine rundungsfehler auftreten
-        -- das ist im XML nicht unterscheidbar
+        -- Convert numbers to a string to avoid rounding errors
+        -- this is not distinguishable in the XML
         table_response = string.gsub(table_response, "(:+[ ]?)([0-9%.]+)( ?[,}]+)", "%1\"%2\"%3")
 
         table_response = cjson.decode(table_response)
     elseif table_response ~= nil and table_response ~= "" then
-        -- den rest in hex weil binärdaten
+        -- the rest in hex because binary data
         kong.log.debug("Found binary response")
         local hex_response = toHex(table_response)
 
@@ -249,12 +286,14 @@ function _M.generateResponse(plugin_conf, table_response, response_code, Request
             table_response = {}
         end
 
+        -- Conversion of the body as a Lua table to the SOAP body
         local status, xml_response = pcall(build_XML, plugin_conf, table_response, response_code, RequestAction, plugin_conf.targetNamespace, plugin_conf.operations[RequestAction].soap)
         if not status then
             kong.log.warn("Unable to build XML body\n\t", xml_response)
             return table_response
         end
 
+        -- Creating the SOAP response
         local status, soap_response = pcall(build_SOAP, xml_response, plugin_conf.namespaces)
         if not status then
             kong.log.err("Unable to build SOAP response\n\t", soap_response)
@@ -265,6 +304,7 @@ function _M.generateResponse(plugin_conf, table_response, response_code, Request
         return soap_response
     end
 
+    -- Return of the REST response if no conversion to SOAP was possible.
     return table_response
 end --]]
 

@@ -31,44 +31,48 @@ local puremagic = require "kong.plugins.soap2rest.puremagic"
 
 local _M = {}
 
----[[ convert values
-local function convertValues(plugin_conf, table, ebene)
+-- Convert encapsulated values
+-- @param plugin_conf Plugin configuration
+-- @param table Input value
+-- @param level Encapsulation level
+local function convertValues(plugin_conf, table, level)
     if table == nil then
         return
     end
 
     for key, value in pairs(table) do
         if type(value) == "table" then
-            if next(value) == nil and ebene > 0 then
-                -- leere tables außer das root element müssen entfernt werden
-                -- sonst werden sie als leeres objekt ({}) gerendert
+            if next(value) == nil and level > 0 then
+                -- empty tables except the root element must be removed
+                -- otherwise they are rendered as an empty object ({})
                 kong.log.debug("Removing "..key.." because it is an empty table")
                 table[key] = nil
             else
-                convertValues(plugin_conf, value, ebene + 1)
+                convertValues(plugin_conf, value, level + 1)
             end
 
         elseif tonumber(value) ~= nil and not string.match(value, "^0[^%.]%d*$") then
-            -- convert numbers
+            -- Conversion of strings to numbers
             table[key] = tonumber(value)
 
         elseif utils.has_value(plugin_conf.soap_arrays, key) then
-            -- fix arrays
+            -- Array conversion
             kong.log.debug("Forcing "..key.." to be an array")
             table[key] = { value }
-            convertValues(plugin_conf, table[key], ebene + 1)
+            convertValues(plugin_conf, table[key], level + 1)
             setmetatable(table[key], cjson.array_mt)
 
         elseif string.match(value, "^{.*}$") then
-            -- convert JSON
+            -- Conversion from JSON
             kong.log.debug("Converting "..key.." to be a JSON")
             table[key] = cjson.decode(value)
 
         end
     end
-end --]]
+end
 
----[[ parse XML namespaces to Lua table
+-- Conversion of XML namespaces to Lua tables
+-- @param xml_request raw XML request
 local function parseNamespaces(xml_request)
     local xmlNamespaces = {}
     for key, value in string.gmatch(xml_request, 'xmlns:([^=]*)="([^"]*)"') do
@@ -77,14 +81,18 @@ local function parseNamespaces(xml_request)
     end
 
     kong.ctx.shared.xmlNamespaces = xmlNamespaces
-end --]]
+end
 
----[[ parse XML namespaces to Lua table
+-- Query the abbreviation of a namespace
+-- @param namespaceName Name of the namespace searched for
+-- @return namespace Namespace abbreviation
 local function getNamespace(namespaceName)
     return kong.ctx.shared.xmlNamespaces[namespaceName]
-end --]]
+end
 
----[[ get the referenced namespaces
+-- Query all namespace names
+-- @param xml_data raw SOAP header as XML
+-- @return alle Namespace Names in the SOAP header
 local function referencedNamespacesAsString(xml_data)
     local namespaces = {}
     for namespaceName in string.gmatch(xml_data, '<([^/:]*):') do
@@ -101,12 +109,17 @@ local function referencedNamespacesAsString(xml_data)
     end
 
     return namespaceString
-end --]]
+end
 
----[[ parse SOAP request body to Lua table
+-- Converting the SOAP request body into a Lua table
+-- @param plugin_conf Plugin configuration
+-- @return  1. SOAP header as Lua table
+--          2. raw SOAP header as XML
+--          3. SOAP body as Lua table
 local function parseBody(plugin_conf)
     local xml_request, msg = kong.request.get_raw_body()
 
+    -- Reading the body from a buffer if the body is too large
     if xml_request == nil then
         kong.log.debug(msg)
         local temp_file = ngx.req.get_body_file()
@@ -120,13 +133,15 @@ local function parseBody(plugin_conf)
     end
 
     parseNamespaces(xml_request)
+
+    -- Extract the SOAP header
     local soap_header_raw = string.gmatch(xml_request, '<[^:<>!]*:Header[%s>].*</[^:<>!]*:Header>')()
 
-    -- Removed namespace shortname from XML request
+    -- Namespace short name removed from XML request
     xml_request = string.gsub( xml_request, "(<%/?)[^:<>!]*:", "%1" )
     kong.log.debug(xml_request)
 
-    -- Parse XML request body to Lua table
+    -- Parsing the XML request body into Lua table
     local request_handler = handler:new()
     local parser = xml2lua.parser(request_handler)
     parser:parse(xml_request)
@@ -136,19 +151,26 @@ local function parseBody(plugin_conf)
 
     local soap_body = request_handler.root["Envelope"]["Body"]
 
-    -- remove attributes from body, propably only namespaces
+    -- Remove attributes from the body, probably only namespaces
     if soap_body["_attr"] ~= nil then
         soap_body["_attr"] = nil
     end
 
+    -- Convert encapsulated values
     convertValues(plugin_conf, soap_body, 0)
 
     return soap_header, soap_header_raw, soap_body
-end --]]
+end
 
----[[ convert SOAP header to REST header
+-- Convert SOAP header to HTTP header
+-- @param soap_header SOAP header as Lua table
+-- @param soap_header_raw raw SOAP header as XML
+-- @param operation Configuration of the SOAP operations
 local function convertHeader(soap_header, soap_header_raw, operation)
+    -- Setting the HTTP Method
     kong.service.request.set_method(string.upper(operation.rest.action))
+
+    -- Setting the request and response content types
     if (operation.rest.response and operation.rest.response.type) then
         kong.service.request.set_header("Accept", operation.rest.response.type)
     end
@@ -156,6 +178,7 @@ local function convertHeader(soap_header, soap_header_raw, operation)
         kong.service.request.set_header("Content-Type", operation.rest.request.type)
     end
 
+    -- Converting the SOAP headers into HTTP headers
     if soap_header ~= nil then
         for key, value in pairs(soap_header) do
             if type(value) == "table" then
@@ -163,11 +186,11 @@ local function convertHeader(soap_header, soap_header_raw, operation)
 
                 -- save security header to ctx map because base64 encoding and kong header breaks the content
                 if string.lower(key) == "security" then
-                    -- alle namespace namen abrufen 
+                    -- Retrieve all namespace names
                     local namespaces = referencedNamespacesAsString(data)
                     kong.log.debug("Namespaces für Header: "..namespaces)
 
-                    -- am ersten xml element registrieren
+                    -- register at the first xml element
                     data = string.gsub(data, "^[ \r\n]*<([^:<>!]*:[^%s>]*)[^>]*>", "<%1 "..namespaces..">")
 
                     kong.ctx.shared.soapSecurityHeader = data
@@ -180,15 +203,17 @@ local function convertHeader(soap_header, soap_header_raw, operation)
             end
         end
     end
-end --]]
+end
 
----[[ convert SOAP request to REST GET
+-- Conversion from SOAP request to REST GET
+-- @param operation Konfiguration der SOAP Operationen
+-- @param bodyValue SOAP body as Lua table
 local function convertGET(operation, bodyValue)
     local RequestParams = "?"
 
     local RequestPath = operation.rest.path
 
-    -- Analyse request body
+    -- Identifying URL parameters
     for key, value in pairs(bodyValue) do
         local count
         RequestPath, count = string.gsub(RequestPath, "{"..key.."}", value)
@@ -198,21 +223,23 @@ local function convertGET(operation, bodyValue)
     end
     RequestParams = string.sub(RequestParams, 1, -2)
 
-    -- Remove unused path params
+    -- Remove unused path parameters
     RequestPath = string.gsub(RequestPath, '(%/{%w*})', '')
 
-    -- Change request path
+    -- Set the request path
     local combined_request_path = RequestPath..RequestParams
     kong.log.debug("Combined Request Path: "..combined_request_path)
     kong.service.request.set_path(combined_request_path)
 
-    -- Change request header to REST
+    -- Change the request header to REST
     kong.service.request.set_raw_body("")
     kong.service.request.clear_header("Content-Type")
     kong.service.request.clear_header("Content-Length")
-end --]]
+end
 
----[[ convert hex string to string
+-- Converting a Hex String to a String
+-- @param str Hex string
+-- @return String
 local function parseHex(str)
     return (
         str:gsub('..', function (cc)
@@ -220,9 +247,11 @@ local function parseHex(str)
         end
         )
     )
-end --]]
+end
 
----[[ generate random boundary
+-- Generation of a random boundary
+-- @param length Length of the boundary
+-- @return random boundary
 local function randomBoundary(length)
     local characterSet = "abcdefghijklmnopqrstuvwxyz0123456789"
 
@@ -233,16 +262,18 @@ local function randomBoundary(length)
     end
 
     return output
-end --]]
+end
 
----[[ convert SOAP request to REST POST
+-- Conversion from SOAP request to REST POST
+-- @param operation Configuration of the SOAP operations
+-- @param bodyValue SOAP body as Lua table
 local function convertPOST(operation, bodyValue)
     local RequestPath = operation.rest.path
 
-    -- Analyse request body
     local body = {}
 
     if (not operation.rest.request or not operation.rest.request.type or string.find(operation.rest.request.type, "multipart/") == nil) then
+        -- Conversion of a SOAP body into JSON
         if operation.rest.request ~= nil and operation.rest.request.type ~= nil then
             kong.log.debug("REST Request Type: "..operation.rest.request.type)
         else
@@ -263,12 +294,13 @@ local function convertPOST(operation, bodyValue)
             end
         end
     else
+        -- Converting a file into a Multipart Body
         kong.log.debug("Sending Multipart")
-        -- set boundary header
+        -- Setting the Boundary header
         local multipartContentType = "multipart/form-data; boundary=----------"..randomBoundary(10)
         kong.service.request.set_header("Content-Type", multipartContentType)
 
-        -- multipart uses boundary header
+        -- Creating a multipart
         local multipart_data = Multipart(nil, multipartContentType)
 
         if bodyValue.datei ~= nil then
@@ -289,7 +321,7 @@ local function convertPOST(operation, bodyValue)
         body = multipart_data:tostring()
     end
 
-    -- Remove unused path params
+    -- Remove unused path parameters
     RequestPath = string.gsub(RequestPath, '(%/{%w*})', '')
     kong.log.debug("Routing to: "..RequestPath)
 
@@ -302,9 +334,11 @@ local function convertPOST(operation, bodyValue)
     kong.log.debug("Upstream Body: "..body)
 
     kong.service.request.set_raw_body(body)
-end --]]
+end
 
----[[ convert SOAP request to REST call
+-- Convert a SOAP request to a REST request
+-- @param plugin_conf Plugin configuration
+-- @return SOAP OperationId
 function _M.convert(plugin_conf)
     if string.upper(kong.request.get_raw_query()) == "WSDL" then
         return "WSDL_FILE"
@@ -316,7 +350,7 @@ function _M.convert(plugin_conf)
         return nil
     end
 
-    -- Analyse request body
+    -- SOAP request body analyse
     local RequestAction, bodyValue = next(soap_body)
     kong.log.debug("Parsed Operation: "..RequestAction)
 
@@ -325,10 +359,10 @@ function _M.convert(plugin_conf)
     local operation = plugin_conf.operations[RequestAction]
     kong.log.debug("SOAP Operation: "..RequestAction.." REST Operation: "..operation.rest.path)
 
-    -- Convert soap header to rest header
+    -- Convert SOAP header
     convertHeader(soap_header, soap_header_raw, operation)
 
-    -- Convert soap body to rest body
+    -- Convert SOAP Body
     local action = {
         ["get"] = function() convertGET(operation, bodyValue) end,
         ["post"] = function() convertPOST(operation, bodyValue) end,
@@ -337,6 +371,6 @@ function _M.convert(plugin_conf)
     action[operation.rest.action]()
 
     return RequestAction
-end --]]
+end
 
 return _M
