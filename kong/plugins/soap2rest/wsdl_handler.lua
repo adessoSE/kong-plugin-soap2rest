@@ -164,7 +164,7 @@ end
 
 -- Analysing ordered response models and soap arrays
 -- @param complex_types Excerpt of all ComplexTypes from the WSDL
--- return   1. Configuration of the return types
+-- @return  1. Configuration of the return types
 --          2. Collection of the names of all SOAP arrays
 local function parse_complexTypes(complex_types)
     local models = {}
