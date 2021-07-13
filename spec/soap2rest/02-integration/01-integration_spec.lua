@@ -21,6 +21,8 @@
 local PLUGIN_NAME = "soap2rest"
 
 local helpers = require "spec.helpers"
+local xml2lua = require "xml2lua"
+local handler = require "xmlhandler.tree"
 
 --local inspect = require "inspect"
 
@@ -34,7 +36,7 @@ for _, strategy in helpers.each_strategy() do
                 "routes",
                 "services",
                 "consumers"
-            })
+            }, {PLUGIN_NAME})
 
             local service = bp.services:insert {
                 name = "httpbin",
@@ -68,6 +70,7 @@ for _, strategy in helpers.each_strategy() do
                     rest_base_path = "/",
                     wsdl_path = "/kong-plugin/spec/soap2rest/resources/test.wsdl",
                     openapi_yaml_path = "/kong-plugin/spec/soap2rest/resources/test.yaml",
+                    expose_wsdl = true,
                     operation_mapping = {
                         GetStatusByCode = "status/{code}"
                     },
@@ -154,18 +157,23 @@ for _, strategy in helpers.each_strategy() do
                         </soapenv:Envelope>
                         ]]
                 })
-
                 assert.response(res).has.status(200)
-                assert.is_same([[
+
+                local template = handler:new()
+                local parser = xml2lua.parser(template)
+                parser:parse([[
 <?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://test/model" xmlns:xs="http://www.w3.org/2001/XMLSchema">
 <soap:Body>
 <tns:GetStatusByCode_OutputMessage>
-<tns:TestDataObject>
-</tns:TestDataObject>
+<TestDataObject></TestDataObject>
 </tns:GetStatusByCode_OutputMessage>
 </soap:Body>
-</soap:Envelope>]], res._cached_body)
+</soap:Envelope>]])
+                local response = handler:new()
+                parser = xml2lua.parser(response)
+                parser:parse(res._cached_body)
+                assert.is_same(template, response)
             end)
 
             it("400 status code", function()
@@ -184,8 +192,10 @@ for _, strategy in helpers.each_strategy() do
                         ]]
                 })
 
-                assert.response(res).has.status(400)
-                assert.is_same([[
+                assert.response(res).has.status(200)
+                local template = handler:new()
+                local parser = xml2lua.parser(template)
+                parser:parse([[
 <?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://test/model" xmlns:xs="http://www.w3.org/2001/XMLSchema">
 <soap:Body>
@@ -193,12 +203,14 @@ for _, strategy in helpers.each_strategy() do
 <faultcode>soap:Client</faultcode>
 <faultstring xml:lang="en">Client error has occurred</faultstring>
 <detail>
-<tns:GetStatusByCode_400>
-</tns:GetStatusByCode_400>
-</detail>
+<tns:GetStatusByCode_400></tns:GetStatusByCode_400></detail>
 </soap:Fault>
 </soap:Body>
-</soap:Envelope>]], res._cached_body)
+</soap:Envelope>]])
+                local response = handler:new()
+                parser = xml2lua.parser(response)
+                parser:parse(res._cached_body)
+                assert.is_same(template, response)
             end)
 
             it("500 status code", function()
@@ -218,7 +230,9 @@ for _, strategy in helpers.each_strategy() do
                 })
 
                 assert.response(res).has.status(500)
-                assert.is_same([[
+                local template = handler:new()
+                local parser = xml2lua.parser(template)
+                parser:parse([[
 <?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://test/model" xmlns:xs="http://www.w3.org/2001/XMLSchema">
 <soap:Body>
@@ -226,12 +240,14 @@ for _, strategy in helpers.each_strategy() do
 <faultcode>soap:Server</faultcode>
 <faultstring xml:lang="en">Server error has occurred</faultstring>
 <detail>
-<tns:GetStatusByCode_500>
-</tns:GetStatusByCode_500>
-</detail>
+<tns:GetStatusByCode_500></tns:GetStatusByCode_500></detail>
 </soap:Fault>
 </soap:Body>
-</soap:Envelope>]], res._cached_body)
+</soap:Envelope>]])
+                local response = handler:new()
+                parser = xml2lua.parser(response)
+                parser:parse(res._cached_body)
+                assert.is_same(template, response)
             end)
         end)
     end)

@@ -65,6 +65,13 @@ local schema = {
                         required = true,
                     },
                 },
+                {-- Expose the wsdl with ?wsdl parameter
+                    expose_wsdl = {
+                        type = "boolean",
+                        default = false,
+                        required = false,
+                    },
+                },
                 {-- Path to the WSDL file of the SOAP API.
                     wsdl_path = {
                         type = "string",

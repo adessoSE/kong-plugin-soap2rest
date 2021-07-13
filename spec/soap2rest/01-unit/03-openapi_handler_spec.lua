@@ -72,7 +72,7 @@ describe(PLUGIN_NAME .. ": (openapi_handler)", function()
         }
     }
 
-    openapi_handler.parseOpenAPI(mock_config)
+    openapi_handler.parse(mock_config)
 
     it("does parse GetTestData correct", function()
         assert.is_not_nil(mock_config.operations.GetTestData)

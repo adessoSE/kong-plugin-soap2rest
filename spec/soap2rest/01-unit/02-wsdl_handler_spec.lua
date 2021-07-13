@@ -20,7 +20,7 @@
 
 local PLUGIN_NAME = "soap2rest"
 
---local helpers = require("spec.helpers")
+local helpers = require("spec.helpers")
 
 local wsdl_handler = require("kong.plugins."..PLUGIN_NAME..".wsdl_handler")
 
@@ -29,7 +29,7 @@ describe(PLUGIN_NAME .. ": (wsdl_handler)", function()
         wsdl_path = "/kong-plugin/spec/soap2rest/resources/test.wsdl"
     }
 
-    wsdl_handler.parseWSDL(mock_config)
+    wsdl_handler.parse(mock_config)
 
     it("does parse raw wsdl content correct", function()
         assert.is_not_nil(mock_config.wsdl_content)
@@ -89,6 +89,29 @@ describe(PLUGIN_NAME .. ": (wsdl_handler)", function()
 
     it("does parse soap models correct", function()
         assert.is_same({
+            GetTestData_OutputMessage = {
+                {
+                    name = "TestDataObject",
+                    type = "TestDataObject"
+                },
+            },
+            PostTestDataById_InputMessage = {
+                {
+                    name = "id",
+                },
+            },
+            PostTestDataById_OutputMessage = {
+                {
+                    name = "body",
+                    type = "TestDataObject"
+                },
+            },
+            PostTestData_InputMessage = {
+                {
+                    name = "body",
+                    type = "TestDataObject"
+                },
+            },
             Response500 = {
                 {
                     name = "id"

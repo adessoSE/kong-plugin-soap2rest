@@ -21,6 +21,8 @@
 local PLUGIN_NAME = "soap2rest"
 
 local helpers = require("spec.helpers")
+local xml2lua = require "xml2lua"
+local handler = require "xmlhandler.tree"
 
 local response_handler = require("kong.plugins."..PLUGIN_NAME..".response_handler")
 
@@ -84,31 +86,45 @@ describe(PLUGIN_NAME .. ": (response_handler)", function()
         }
     }
 
+    before_each(function()
+        stub(kong.service.response, "get_header")
+
+        kong.service.response.get_header = function(key)
+            return "application/json"
+          end
+    end)
+
     it("does convert GetTestData 200 response correct ", function()
         local soap_response = response_handler.generateResponse(mock_config, "{\"id\":12, \"meta\":{\"name\":\"test\", \"value\":1337, \"code\":200}}", 200, "GetTestData")
-
-        assert.is_same([[
+        local template = handler:new()
+        local parser = xml2lua.parser(template)
+        parser:parse([[
 <?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://test/model" xmlns:xs="http://www.w3.org/2001/XMLSchema">
 <soap:Body>
 <tns:GetTestData_OutputMessage>
-<tns:TestDataObject>
-  <tns:id>12</tns:id>
-  <tns:meta>
-    <tns:name>test</tns:name>
-    <tns:value>1337</tns:value>
-    <tns:code>200</tns:code>
-  </tns:meta>
-</tns:TestDataObject>
+<TestDataObject>  <id>12</id>
+  <meta>    <name>test</name>
+    <value>1337</value>
+    <code>200</code>
+
+  </meta>
+
+</TestDataObject>
 </tns:GetTestData_OutputMessage>
 </soap:Body>
-</soap:Envelope>]], soap_response)
+</soap:Envelope>]])
+        local response = handler:new()
+        parser = xml2lua.parser(response)
+        parser:parse(soap_response)
+        assert.is_same(template, response)
     end)
 
     it("does convert GetTestData 400 response correct ", function()
         local soap_response = response_handler.generateResponse(mock_config, "{\"id\":\"abc123\", \"code\":400, \"data\":\"Hello fault\"}", 400, "GetTestData")
-
-        assert.is_same([[
+        local template = handler:new()
+        local parser = xml2lua.parser(template)
+        parser:parse([[
 <?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://test/model" xmlns:xs="http://www.w3.org/2001/XMLSchema">
 <soap:Body>
@@ -116,19 +132,23 @@ describe(PLUGIN_NAME .. ": (response_handler)", function()
 <faultcode>soap:Client</faultcode>
 <faultstring xml:lang="en">Client error has occurred</faultstring>
 <detail>
-<tns:GetTestData_400>
-  <tns:id>abc123</tns:id>
-</tns:GetTestData_400>
-</detail>
+<tns:GetTestData_400>  <id>abc123</id>
+
+</tns:GetTestData_400></detail>
 </soap:Fault>
 </soap:Body>
-</soap:Envelope>]], soap_response)
+</soap:Envelope>]])
+        local response = handler:new()
+        parser = xml2lua.parser(response)
+        parser:parse(soap_response)
+        assert.is_same(template, response)
     end)
 
     it("does convert GetTestData 404 response correct ", function()
         local soap_response = response_handler.generateResponse(mock_config, "{\"id\":\"abc123\", \"code\":404, \"data\":\"Hello fault\"}", 404, "GetTestData")
-
-        assert.is_same([[
+        local template = handler:new()
+        local parser = xml2lua.parser(template)
+        parser:parse([[
 <?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://test/model" xmlns:xs="http://www.w3.org/2001/XMLSchema">
 <soap:Body>
@@ -136,19 +156,23 @@ describe(PLUGIN_NAME .. ": (response_handler)", function()
 <faultcode>soap:Client</faultcode>
 <faultstring xml:lang="en">Client error has occurred</faultstring>
 <detail>
-<tns:GetTestData_400>
-  <tns:id>abc123</tns:id>
-</tns:GetTestData_400>
-</detail>
+<tns:GetTestData_400>  <id>abc123</id>
+
+</tns:GetTestData_400></detail>
 </soap:Fault>
 </soap:Body>
-</soap:Envelope>]], soap_response)
+</soap:Envelope>]])
+        local response = handler:new()
+        parser = xml2lua.parser(response)
+        parser:parse(soap_response)
+        assert.is_same(template,response)
     end)
 
     it("does convert GetTestData 500 response correct ", function()
         local soap_response = response_handler.generateResponse(mock_config, "{\"id\":\"abc123\", \"code\":500, \"data\":\"Hello fault\"}", 500, "GetTestData")
-
-        assert.is_same([[
+        local template = handler:new()
+        local parser = xml2lua.parser(template)
+        parser:parse([[
 <?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://test/model" xmlns:xs="http://www.w3.org/2001/XMLSchema">
 <soap:Body>
@@ -156,20 +180,24 @@ describe(PLUGIN_NAME .. ": (response_handler)", function()
 <faultcode>soap:Server</faultcode>
 <faultstring xml:lang="en">Server error has occurred</faultstring>
 <detail>
-<tns:GetTestData_500>
-  <tns:id>abc123</tns:id>
-  <tns:code>500</tns:code>
-</tns:GetTestData_500>
-</detail>
+<tns:GetTestData_500>  <id>abc123</id>
+  <code>500</code>
+
+</tns:GetTestData_500></detail>
 </soap:Fault>
 </soap:Body>
-</soap:Envelope>]], soap_response)
+</soap:Envelope>]])
+        local response = handler:new()
+        parser = xml2lua.parser(response)
+        parser:parse(soap_response)
+        assert.is_same(template, response)
     end)
 
     it("does convert GetTestData 501 response correct ", function()
         local soap_response = response_handler.generateResponse(mock_config, "{\"id\":\"abc123\", \"code\":501, \"data\":\"Hello fault\"}", 501, "GetTestData")
-
-        assert.is_same([[
+        local template = handler:new()
+        local parser = xml2lua.parser(template)
+        parser:parse([[
 <?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://test/model" xmlns:xs="http://www.w3.org/2001/XMLSchema">
 <soap:Body>
@@ -177,14 +205,17 @@ describe(PLUGIN_NAME .. ": (response_handler)", function()
 <faultcode>soap:Server</faultcode>
 <faultstring xml:lang="en">Server error has occurred</faultstring>
 <detail>
-<tns:GetTestData_500>
-  <tns:id>abc123</tns:id>
-  <tns:code>501</tns:code>
-</tns:GetTestData_500>
-</detail>
+<tns:GetTestData_500>  <id>abc123</id>
+  <code>501</code>
+
+</tns:GetTestData_500></detail>
 </soap:Fault>
 </soap:Body>
-</soap:Envelope>]], soap_response)
+</soap:Envelope>]])
+        local response = handler:new()
+        parser = xml2lua.parser(response)
+        parser:parse(soap_response)
+        assert.is_same(template, response)
     end)
 
 end)

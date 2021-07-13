@@ -268,8 +268,9 @@ function _M.generateResponse(plugin_conf, table_response, response_code, Request
         table_response = string.gsub(table_response, "(:+[ ]?)([0-9%.]+)( ?[,}]+)", "%1\"%2\"%3")
 
         table_response = cjson.decode(table_response)
-    elseif table_response ~= nil and table_response ~= "" then
-        -- the rest in hex because binary data
+    elseif table_response ~= nil and table_response ~= "" and
+            tonumber(string.sub(response_code, 1, 1)) ~= 4 and tonumber(string.sub(response_code, 1, 1)) ~= 5 then
+        -- If the request was successful, convert the response to hex because the response contains binary data.
         kong.log.debug("Found binary response")
         local hex_response = toHex(table_response)
 
@@ -277,6 +278,9 @@ function _M.generateResponse(plugin_conf, table_response, response_code, Request
         table_response = {
             response = hex_response
         }
+    elseif tonumber(string.sub(response_code, 1, 1)) == 4 or tonumber(string.sub(response_code, 1, 1)) == 5 then
+        -- Error messages that are not in json are ignored.
+        table_response = nil
     end
 
     if type(table_response) == "table" or table_response == nil then

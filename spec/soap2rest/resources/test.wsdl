@@ -48,7 +48,7 @@
       </xs:complexType>
       <xs:complexType name="GetTestData_OutputMessage">
         <xs:sequence>
-          <xs:element minOccurs="1" name="TestDataObject"></xs:element>
+          <xs:element minOccurs="1" name="TestDataObject" type="schemas:TestDataObject" ></xs:element>
         </xs:sequence>
       </xs:complexType>
 

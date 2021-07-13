@@ -162,10 +162,10 @@ local function parseBody(plugin_conf)
     return soap_header, soap_header_raw, soap_body
 end
 
--- Convert SOAP header to HTTP header
--- @param soap_header SOAP header as Lua table
--- @param soap_header_raw raw SOAP header as XML
--- @param operation Configuration of the SOAP operations
+-- SOAP Header in HTTP Header konvertieren
+-- @param soap_header SOAP-Header als Lua Tabelle
+-- @param soap_header_raw roher SOAP-Header als XML
+-- @param operation Konfiguration der SOAP Operationen
 local function convertHeader(soap_header, soap_header_raw, operation)
     -- Setting the HTTP Method
     kong.service.request.set_method(string.upper(operation.rest.action))
@@ -208,17 +208,25 @@ end
 -- Conversion from SOAP request to REST GET
 -- @param operation Konfiguration der SOAP Operationen
 -- @param bodyValue SOAP body as Lua table
-local function convertGET(operation, bodyValue)
+function convertGET(operation, bodyValue)
     local RequestParams = "?"
 
     local RequestPath = operation.rest.path
 
     -- Identifying URL parameters
     for key, value in pairs(bodyValue) do
+        -- Escaping all GET parameters
+        value = ngx.escape_uri(value, 2)
+
+        -- Escaping all '%', as string.gsub sont does not work
+        value = value:gsub("%%", "%%%%")
+
         local count
         RequestPath, count = string.gsub(RequestPath, "{"..key.."}", value)
-        if count == 0 and type(value) ~= "table" then 
-            RequestParams = RequestParams..key.."="..ngx.escape_uri(value).."&"
+        if count == 0 and type(value) ~= "table" then
+            -- Replace the double escaped '%'
+            value = value:gsub("%%%%", "%%")
+            RequestParams = RequestParams..key.."="..value.."&"
         end
     end
     RequestParams = string.sub(RequestParams, 1, -2)

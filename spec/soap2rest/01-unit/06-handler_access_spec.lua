@@ -44,6 +44,7 @@ describe(PLUGIN_NAME .. ": (handler)", function()
         stub(stubbed_ngx, "log")
 
         stub(kong.log, "err")
+        stub(kong.request, "get_headers")
 
         handler = plugin_handler()
     end)
@@ -58,6 +59,7 @@ describe(PLUGIN_NAME .. ": (handler)", function()
                 rest_base_path = "/spec/",
                 wsdl_path = "/kong-plugin/spec/soap2rest/resources/test.wsdl",
                 openapi_yaml_path = "/kong-plugin/spec/soap2rest/resources/test.yaml",
+                expose_wsdl = true,
             }
             handler:access(mock_config)
         end)
@@ -76,6 +78,7 @@ describe(PLUGIN_NAME .. ": (handler)", function()
                 rest_base_path = "/spec/",
                 wsdl_path = "/kong-plugin/spec/soap2rest/resources/test.wsdl",
                 openapi_yaml_path = "/kong-plugin/spec/soap2rest/resources/test.yaml",
+                expose_wsdl = true,
                 operations = {
                     GetTestData = {
                         rest = {

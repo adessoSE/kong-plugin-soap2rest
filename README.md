@@ -99,6 +99,7 @@ RUN luarocks install /tmp/plugins/kong-plugin-soap2rest*.rock && \
 | enabled                     | no       | `true`  | Whether this plugin will be applied.                                     |
 | config.rest_base_path       | yes      |         | The base path of the rest api. (Must start and end with '/')             |
 | config.openapi_yaml_path    | yes      |         | The path of the OpenAPI file.                                            |
+| config.expose_wsdl          | no       | `false` | Expose the wsdl with ?wsdl parameter                                     |
 | config.wsdl_path            | yes      |         | The path of the WSDL file.                                               |
 | config.operation_mapping    | no       |         | Map of operation id and rest path. (rest path must never begin with '/') |
 

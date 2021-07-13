@@ -48,8 +48,10 @@ function soap2rest:access(plugin_conf)
 
     -- Logging of all HTTP headers
     local headers = kong.request.get_headers()
-    for key, value in pairs(headers) do
-        kong.log.debug("Header: " .. key .. "; Value: " .. value)
+    if headers ~= nil then
+        for key, value in pairs(headers) do
+            kong.log.debug("Header: " .. key .. "; Value: " .. value)
+        end
     end
 
     -- Automatic configuration if it has not yet been executed.
@@ -90,7 +92,10 @@ function soap2rest:header_filter(plugin_conf)
     local RequestAction = kong.request.get_header("X-SOAP-RequestAction")
 
     -- Change response header to SOAP
-    if RequestAction == nil or RequestAction == "WSDL_FILE" or plugin_conf.operations[RequestAction].rest.response.type:sub(-#"json") == "json" then
+    if RequestAction == "WSDL_FILE" and not plugin_conf.expose_wsdl then
+        kong.response.set_header("Content-Type","text/plain")
+
+    elseif RequestAction == nil or RequestAction == "WSDL_FILE" or plugin_conf.operations[RequestAction].rest.response.type:sub(-#"json") == "json" then
         kong.response.set_header("Content-Type","application/xml; charset=utf-8")
     else
         kong.response.set_header("Content-Type", plugin_conf.operations[RequestAction].rest.response.type)
@@ -111,7 +116,10 @@ function soap2rest:header_filter(plugin_conf)
 
     -- sets response code for WSDL file
     if RequestAction == "WSDL_FILE" then
-        if plugin_conf.wsdl_content ~= nil then
+        if not plugin_conf.expose_wsdl then
+            kong.response.set_status(404)
+
+        elseif plugin_conf.wsdl_content ~= nil then
             kong.response.set_status(200)
 
         elseif kong.response.get_status() ~= 401 then
@@ -154,7 +162,7 @@ function soap2rest:body_filter(plugin_conf)
     local RequestAction = kong.request.get_header("X-SOAP-RequestAction")
 
     -- Query whether the request is the WSDL
-    if RequestAction == "WSDL_FILE" then
+    if RequestAction == "WSDL_FILE" and plugin_conf.expose_wsdl then
         ngx.arg[1] = plugin_conf.wsdl_content
     else
         local table_response = table.concat(ngx.ctx.buffers)
