@@ -162,10 +162,10 @@ local function parseBody(plugin_conf)
     return soap_header, soap_header_raw, soap_body
 end
 
--- SOAP Header in HTTP Header konvertieren
--- @param soap_header SOAP-Header als Lua Tabelle
--- @param soap_header_raw roher SOAP-Header als XML
--- @param operation Konfiguration der SOAP Operationen
+-- Convert SOAP header to HTTP header
+-- @param soap_header SOAP header as Lua table
+-- @param soap_header_raw raw SOAP header as XML
+-- @param operation Configuration of the SOAP operations
 local function convertHeader(soap_header, soap_header_raw, operation)
     -- Setting the HTTP Method
     kong.service.request.set_method(string.upper(operation.rest.action))
@@ -272,6 +272,17 @@ local function randomBoundary(length)
     return output
 end
 
+local function guessFileName(content_type)
+    -- default is CSV because TXT and CSV cannot be distinguished
+    local file_name = "upload.csv"
+
+    if content_type ~= nil and string.find(content_type, "zip") ~= nil then
+        file_name = "upload.zip"
+    end
+
+    return file_name
+end
+
 -- Conversion from SOAP request to REST POST
 -- @param operation Configuration of the SOAP operations
 -- @param bodyValue SOAP body as Lua table
@@ -315,9 +326,10 @@ local function convertPOST(operation, bodyValue)
             local hex = bodyValue.datei:gsub(" ", "")
             local data = parseHex(hex)
             local content_type = puremagic.via_content(data)
+            local file_name = guessFileName(content_type)
 
             kong.log.debug("Datei Content-Type: "..content_type)
-            multipart_data:set_simple("datei", data, "upload.tmp", content_type)
+            multipart_data:set_simple("datei", data, file_name, content_type)
 
         end
 
