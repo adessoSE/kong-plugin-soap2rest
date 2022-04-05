@@ -63,7 +63,7 @@ local function parse_schema(raw_schema)
     -- Identify the types
     local types = {}
     for key, value in pairs(raw_schema['xs:complexType']) do
-        if value._attr.name:sub(-#'_OutputMessage') == '_OutputMessage' then
+        if value._attr ~= nil and value._attr.name:sub(-#'_OutputMessage') == '_OutputMessage' then
             if value['xs:sequence'] ~= nil and value['xs:sequence']['xs:element'] ~= nil then
                 -- xs typen are basic values
                 if value['xs:sequence']['xs:element']._attr.type ~= nil and value['xs:sequence']['xs:element']._attr.type:find('^xs:') == nil then
@@ -84,7 +84,7 @@ local function parse_schema(raw_schema)
     -- Assigning the types to InputMessage and OutputMessage respectively.
     local schema = {}
     for key, value in pairs(raw_schema['xs:element']) do
-        if value._attr.name:sub(-#'_OutputMessage') == '_OutputMessage'  then
+        if value._attr ~= nil and value._attr.name:sub(-#'_OutputMessage') == '_OutputMessage'  then
             schema[value._attr.name] = types[value._attr.name]
         elseif value._attr.name:sub(-#'_InputMessage') ~= '_InputMessage' then
             schema[value._attr.name] = (value._attr.type ~= nil and value._attr.type:gsub("schemas:", "") or value._attr.name)
@@ -217,12 +217,15 @@ function _M.parse(plugin_conf)
         return
     end
 
+    plugin_conf.wsdl_content = wsdl_content
+
+    -- Remove the namespace 'wsdl' from all the tags
+    local wsdl_content = wsdl_content:gsub("wsdl:", "")
+
     -- Convert WSDL file into a Lua table
     local wsdl_handler = handler:new()
     local parser = xml2lua.parser(wsdl_handler)
     parser:parse(wsdl_content)
-
-    plugin_conf.wsdl_content = wsdl_content
 
     -- Identify namespaces from the WSDL schema
     local status, namespaces, targetNamespace = pcall(parse_namespaces, wsdl_handler.root.definitions.types['xs:schema'])
@@ -242,7 +245,7 @@ function _M.parse(plugin_conf)
     end
 
     -- Identify the SOAP operations
-    local status, operations = pcall(parse_operations, wsdl_handler.root.definitions.portType.operation, schema)
+    local status, operations = pcall(parse_operations, utils.to_array(wsdl_handler.root.definitions.portType.operation), schema)
     if not status then
         kong.log.err("Unable to parse WSDL operations\n\t", operations)
         return

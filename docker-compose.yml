@@ -72,7 +72,7 @@ services:
       - "8001:8001"
       - "8000:8000"
     volumes:
-      - ./test/zuers:/test/zuers
+      - ./test:/test
     depends_on:
       - kong-migration
       - kong-database

@@ -48,4 +48,27 @@ function _M.has_value (array, object)
     return false
 end
 
+-- Checking whether an opbject is an array
+-- @param t Lua Table
+-- @return boolean
+function _M.is_array(t)
+    local i = 0
+    for _ in pairs(t) do
+        i = i + 1
+        if t[i] == nil then return false end
+    end
+    return true
+end
+
+-- Parse table to array if it is only one entry
+-- @param t Lua Table
+-- @return Lua Array
+function _M.to_array(t)
+    if not _M.is_array(t) then
+        t = { t }
+    end
+    return t
+end
+  
+
 return _M
