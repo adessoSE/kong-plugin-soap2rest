@@ -302,7 +302,7 @@ curl -i -X GET --url http://localhost:8000/v2/pet/1
 #### Request
 ``` bash
 curl -i -X POST --url http://localhost:8000/soap-api/v2/ \
-    --header "Content-Type: application/xml" \
+    --header "Content-Type: text/xml" \
     --data '<?xml version="1.0" encoding="utf-8"?>
             <soap:Envelope
                 xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
