@@ -177,7 +177,7 @@ local function convertHeader(plugin_conf, soap_header, soap_header_raw, operatio
         kong.service.request.clear_header("Accept")
 
     else
-        -- Setzen der Anfrage und Antwort Content-Types
+        -- Setting the request and response content types
         if (operation.rest.response and operation.rest.response.type) then
             kong.service.request.set_header("Accept", operation.rest.response.type)
         end
