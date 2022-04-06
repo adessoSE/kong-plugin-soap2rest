@@ -96,7 +96,7 @@ function soap2rest:header_filter(plugin_conf)
         kong.response.set_header("Content-Type","text/plain")
 
     elseif RequestAction == nil or RequestAction == "WSDL_FILE" or plugin_conf.operations[RequestAction].rest.response.type:sub(-#"json") == "json" then
-        kong.response.set_header("Content-Type","application/xml; charset=utf-8")
+        kong.response.set_header("Content-Type","text/xml; charset=utf-8")
     else
         kong.response.set_header("Content-Type", plugin_conf.operations[RequestAction].rest.response.type)
     end

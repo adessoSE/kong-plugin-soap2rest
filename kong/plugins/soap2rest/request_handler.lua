@@ -163,19 +163,27 @@ local function parseBody(plugin_conf)
 end
 
 -- Convert SOAP header to HTTP header
+-- @param plugin_conf Plugin configuration
 -- @param soap_header SOAP header as Lua table
 -- @param soap_header_raw raw SOAP header as XML
 -- @param operation Configuration of the SOAP operations
-local function convertHeader(soap_header, soap_header_raw, operation)
+local function convertHeader(plugin_conf, soap_header, soap_header_raw, operation)
     -- Setting the HTTP Method
     kong.service.request.set_method(string.upper(operation.rest.action))
 
-    -- Setting the request and response content types
-    if (operation.rest.response and operation.rest.response.type) then
-        kong.service.request.set_header("Accept", operation.rest.response.type)
-    end
-    if (operation.rest.request and operation.rest.request.type) then
-        kong.service.request.set_header("Content-Type", operation.rest.request.type)
+    local open_api_content_type = operation.rest.request.type
+    if not string.find(open_api_content_type, "multipart") and plugin_conf.content_type ~= nil then
+        kong.service.request.set_header("Content-Type", plugin_conf.content_type)
+        kong.service.request.clear_header("Accept")
+
+    else
+        -- Setzen der Anfrage und Antwort Content-Types
+        if (operation.rest.response and operation.rest.response.type) then
+            kong.service.request.set_header("Accept", operation.rest.response.type)
+        end
+        if (operation.rest.request and operation.rest.request.type) then
+            kong.service.request.set_header("Content-Type", open_api_content_type)
+        end
     end
 
     -- Converting the SOAP headers into HTTP headers
@@ -380,7 +388,7 @@ function _M.convert(plugin_conf)
     kong.log.debug("SOAP Operation: "..RequestAction.." REST Operation: "..operation.rest.path)
 
     -- Convert SOAP header
-    convertHeader(soap_header, soap_header_raw, operation)
+    convertHeader(plugin_conf, soap_header, soap_header_raw, operation)
 
     -- Convert SOAP Body
     local action = {

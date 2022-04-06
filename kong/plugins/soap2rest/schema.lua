@@ -78,6 +78,12 @@ local schema = {
                         required = true,
                     },
                 },
+                {-- Der Content-Type mit dem das Upstream API aufgerufen werden soll.
+                    content_type = {
+                        type = "string",
+                        required = false,
+                    },
+                },
                 {-- SOAP Operation Mappings
                     -- @key:    SOAP OperationId
                     -- @value:  REST Path with parameter
